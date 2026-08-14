@@ -1,602 +1,430 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="terminal">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RISK DESK — Defined-Risk Position Ledger</title>
+<title>RISK DESK — Defined-Risk Position &amp; P&amp;L Ledger</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --ink:#0b0d10;
-    --panel:#12151a;
-    --panel-raised:#161a20;
-    --line:#242a32;
-    --line-soft:#1a1f26;
-    --paper:#eae7dd;
-    --muted:#868c96;
-    --muted-dim:#565c66;
-    --amber:#e8a33d;
-    --amber-dim:#8a6626;
-    --profit:#3ecf8e;
-    --profit-dim:#1e4a37;
-    --risk:#e5484d;
-    --risk-dim:#4a2225;
-    --display:'Space Grotesk', sans-serif;
-    --mono:'JetBrains Mono', monospace;
-    --body:'Inter', sans-serif;
-  }
-  *{box-sizing:border-box;margin:0;padding:0;}
-  html{-webkit-tap-highlight-color:transparent;}
-  body{
-    background:var(--ink);
-    color:var(--paper);
-    font-family:var(--body);
-    min-height:100vh;
-    overflow-x:hidden;
-    background-image:
-      linear-gradient(rgba(232,163,61,0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(232,163,61,0.025) 1px, transparent 1px);
-    background-size:36px 36px;
-  }
-  ::selection{background:var(--amber);color:var(--ink);}
+/* ============================================================
+   THEME TOKENS — 4 distinct palettes swapped via [data-theme]
+   ============================================================ */
+:root,
+[data-theme="terminal"]{
+  --bg:#0b0d10; --surface:#12151a; --surface-2:#161a20;
+  --border:#242a32; --border-soft:#1a1f26;
+  --text:#eae7dd; --text-dim:#868c96; --text-faint:#565c66;
+  --accent:#e8a33d; --accent-dim:#8a6626; --accent-soft:#3a2f1a;
+  --profit:#3ecf8e; --profit-dim:#1e4a37;
+  --risk:#e5484d; --risk-dim:#4a2225;
+  --radius:2px; --radius-lg:2px;
+  --grid-op:0.028;
+}
+[data-theme="dawn"]{
+  --bg:#f1f3f0; --surface:#ffffff; --surface-2:#f7f8f5;
+  --border:#dde2dc; --border-soft:#e9ece6;
+  --text:#12191a; --text-dim:#5c6b66; --text-faint:#8ea19a;
+  --accent:#0f6b5c; --accent-dim:#bfe0d6; --accent-soft:#e3f2ed;
+  --profit:#187a52; --profit-dim:#d9f0e5;
+  --risk:#b8352f; --risk-dim:#f7ddd9;
+  --radius:8px; --radius-lg:12px;
+  --grid-op:0.05;
+}
+[data-theme="slate"]{
+  --bg:#0d1117; --surface:#141a24; --surface-2:#182131;
+  --border:#232b38; --border-soft:#1b222d;
+  --text:#e7ecf3; --text-dim:#8b96a8; --text-faint:#57627a;
+  --accent:#4d9fff; --accent-dim:#1f3a5c; --accent-soft:#16233a;
+  --profit:#34d399; --profit-dim:#164a37;
+  --risk:#f0576b; --risk-dim:#4a1c26;
+  --radius:6px; --radius-lg:10px;
+  --grid-op:0.03;
+}
+[data-theme="noir"]{
+  --bg:#0a0a0a; --surface:#131313; --surface-2:#181818;
+  --border:#2b2b2b; --border-soft:#1f1f1f;
+  --text:#f0efe9; --text-dim:#9a9a94; --text-faint:#5c5c58;
+  --accent:#ffffff; --accent-dim:#3a3a3a; --accent-soft:#1c1c1c;
+  --profit:#f0efe9; --profit-dim:#232323;
+  --risk:#ff3b3b; --risk-dim:#3d1414;
+  --radius:0px; --radius-lg:0px;
+  --grid-op:0.05;
+}
+--display:'Space Grotesk';
+:root{ --display:'Space Grotesk', sans-serif; --mono:'JetBrains Mono', monospace; --body:'Inter', sans-serif; }
 
-  /* ---------- SCREEN MANAGEMENT ---------- */
-  .screen{display:none;min-height:100vh;}
-  .screen.active{display:block;}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{-webkit-tap-highlight-color:transparent;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--body);
+  min-height:100vh;
+  overflow-x:hidden;
+  transition:background 0.35s ease, color 0.35s ease;
+  background-image:
+    linear-gradient(rgba(232,163,61,var(--grid-op)) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,163,61,var(--grid-op)) 1px, transparent 1px);
+  background-size:36px 36px;
+}
+::selection{background:var(--accent);color:var(--bg);}
+[data-theme="dawn"] ::selection{color:#fff;}
+[data-theme="noir"] ::selection{color:#000;}
+button, input, select{font-family:inherit;}
 
-  /* ================= LANDING ================= */
-  #screen-landing{
-    display:flex;
-    flex-direction:column;
-    min-height:100vh;
-    position:relative;
-  }
-  .ticker{
-    border-bottom:1px solid var(--line);
-    overflow:hidden;
-    white-space:nowrap;
-    padding:10px 0;
-    background:var(--panel);
-  }
-  .ticker.bottom-line{border-bottom:none;border-top:1px solid var(--line);}
-  .ticker-track{
-    display:inline-block;
-    white-space:nowrap;
-    animation:ticker-scroll 55s linear infinite;
-    font-family:var(--mono);
-    font-size:12px;
-    letter-spacing:0.03em;
-    color:var(--muted-dim);
-  }
-  .ticker.reverse .ticker-track{animation-direction:reverse;animation-duration:70s;}
-  .ticker-track span{margin-right:44px;}
-  .ticker-track span::before{content:"◆ ";color:var(--amber-dim);}
-  @keyframes ticker-scroll{
-    from{transform:translateX(0);}
-    to{transform:translateX(-50%);}
-  }
+.screen{display:none;min-height:100vh;}
+.screen.active{display:block;}
 
-  .landing-main{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    text-align:center;
-    padding:48px 24px;
-    position:relative;
-  }
-  .brand-mark{
-    font-family:var(--mono);
-    font-size:12px;
-    letter-spacing:0.35em;
-    color:var(--amber);
-    text-transform:uppercase;
-    margin-bottom:28px;
-    opacity:0;
-    animation:rise 0.7s ease forwards 0.1s;
-  }
-  .brand-mark::before{content:"01 — 02 — 03 — 04 — 05";display:block;font-size:10px;color:var(--muted-dim);letter-spacing:0.25em;margin-bottom:10px;}
-  h1.title{
-    font-family:var(--display);
-    font-weight:700;
-    font-size:clamp(40px, 8vw, 92px);
-    line-height:0.98;
-    letter-spacing:-0.02em;
-    color:var(--paper);
-    opacity:0;
-    animation:rise 0.8s ease forwards 0.25s;
-  }
-  h1.title em{
-    font-style:normal;
-    color:var(--amber);
-  }
-  .subtitle{
-    font-family:var(--body);
-    font-size:15px;
-    color:var(--muted);
-    max-width:520px;
-    margin:22px auto 0;
-    line-height:1.6;
-    opacity:0;
-    animation:rise 0.8s ease forwards 0.4s;
-  }
+/* ================= THEME SWITCHER ================= */
+.theme-switch{display:flex;gap:6px;align-items:center;}
+.theme-dot{
+  width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border);
+  cursor:pointer;position:relative;transition:all 0.2s ease;background:none;padding:0;
+  flex:none;
+}
+.theme-dot.terminal{background:linear-gradient(135deg,#0b0d10 50%,#e8a33d 50%);}
+.theme-dot.dawn{background:linear-gradient(135deg,#f1f3f0 50%,#0f6b5c 50%);}
+.theme-dot.slate{background:linear-gradient(135deg,#0d1117 50%,#4d9fff 50%);}
+.theme-dot.noir{background:linear-gradient(135deg,#0a0a0a 50%,#ffffff 50%);}
+.theme-dot.active{border-color:var(--accent);transform:scale(1.15);}
+.theme-dot:hover{transform:scale(1.1);}
 
-  .quote-box{
-    margin-top:56px;
-    max-width:640px;
-    min-height:120px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    opacity:0;
-    animation:rise 0.8s ease forwards 0.55s;
-  }
-  .quote-rule{
-    width:34px;height:2px;background:var(--amber);margin-bottom:20px;
-  }
-  #quote-text{
-    font-family:var(--display);
-    font-size:clamp(18px, 2.6vw, 25px);
-    font-weight:500;
-    color:var(--paper);
-    line-height:1.5;
-    transition:opacity 0.5s ease, transform 0.5s ease;
-  }
-  #quote-index{
-    font-family:var(--mono);
-    font-size:11px;
-    color:var(--muted-dim);
-    margin-top:18px;
-    letter-spacing:0.1em;
-  }
-  .fade-out{opacity:0 !important;transform:translateY(6px);}
+/* ================= LANDING ================= */
+#screen-landing{display:flex;flex-direction:column;min-height:100vh;position:relative;}
+.ticker{border-bottom:1px solid var(--border);overflow:hidden;white-space:nowrap;padding:10px 0;background:var(--surface);}
+.ticker.bottom-line{border-bottom:none;border-top:1px solid var(--border);}
+.ticker-track{display:inline-block;white-space:nowrap;animation:ticker-scroll 55s linear infinite;font-family:var(--mono);font-size:12px;letter-spacing:0.03em;color:var(--text-faint);}
+.ticker.reverse .ticker-track{animation-direction:reverse;animation-duration:70s;}
+.ticker-track span{margin-right:44px;}
+.ticker-track span::before{content:"◆ ";color:var(--accent-dim);}
+@keyframes ticker-scroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
 
-  .enter-btn{
-    margin-top:52px;
-    background:transparent;
-    border:1px solid var(--amber);
-    color:var(--amber);
-    font-family:var(--mono);
-    font-size:13px;
-    letter-spacing:0.15em;
-    text-transform:uppercase;
-    padding:16px 38px;
-    cursor:pointer;
-    position:relative;
-    transition:all 0.25s ease;
-    opacity:0;
-    animation:rise 0.8s ease forwards 0.7s;
-  }
-  .enter-btn:hover{background:var(--amber);color:var(--ink);}
-  .enter-btn:focus-visible{outline:2px solid var(--amber);outline-offset:4px;}
+.landing-topbar{display:flex;justify-content:flex-end;padding:16px 24px 0;}
 
-  @keyframes rise{
-    from{opacity:0;transform:translateY(14px);}
-    to{opacity:1;transform:translateY(0);}
-  }
+.landing-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 24px;position:relative;}
+.brand-mark{font-family:var(--mono);font-size:12px;letter-spacing:0.35em;color:var(--accent);text-transform:uppercase;margin-bottom:28px;opacity:0;animation:rise 0.7s ease forwards 0.1s;}
+.brand-mark::before{content:"CASH — FUTURES — OPTIONS";display:block;font-size:10px;color:var(--text-faint);letter-spacing:0.25em;margin-bottom:10px;}
+h1.title{font-family:var(--display);font-weight:700;font-size:clamp(38px, 7.5vw, 84px);line-height:0.98;letter-spacing:-0.02em;color:var(--text);opacity:0;animation:rise 0.8s ease forwards 0.25s;}
+h1.title em{font-style:normal;color:var(--accent);}
+.subtitle{font-family:var(--body);font-size:15px;color:var(--text-dim);max-width:540px;margin:22px auto 0;line-height:1.6;opacity:0;animation:rise 0.8s ease forwards 0.4s;}
 
-  @media (prefers-reduced-motion: reduce){
-    .ticker-track{animation:none;}
-    .brand-mark,h1.title,.subtitle,.quote-box,.enter-btn{animation:none;opacity:1;}
-  }
+.quote-box{margin-top:52px;max-width:640px;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;animation:rise 0.8s ease forwards 0.55s;}
+.quote-rule{width:34px;height:2px;background:var(--accent);margin-bottom:20px;}
+#quote-text{font-family:var(--display);font-size:clamp(17px, 2.4vw, 24px);font-weight:500;color:var(--text);line-height:1.5;transition:opacity 0.5s ease, transform 0.5s ease;}
+#quote-index{font-family:var(--mono);font-size:11px;color:var(--text-faint);margin-top:18px;letter-spacing:0.1em;}
+.fade-out{opacity:0 !important;transform:translateY(6px);}
 
-  /* ================= CALCULATOR ================= */
-  #screen-calc{padding-bottom:60px;}
-  .calc-header{
-    border-bottom:1px solid var(--line);
-    padding:22px 28px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    background:var(--panel);
-    position:sticky;top:0;z-index:20;
-  }
-  .calc-header .brand{
-    font-family:var(--mono);
-    font-size:13px;
-    letter-spacing:0.2em;
-    color:var(--amber);
-  }
-  .back-btn{
-    background:none;border:1px solid var(--line);color:var(--muted);
-    font-family:var(--mono);font-size:11px;letter-spacing:0.08em;
-    padding:9px 16px;cursor:pointer;transition:all 0.2s ease;text-transform:uppercase;
-  }
-  .back-btn:hover{border-color:var(--amber);color:var(--amber);}
+.enter-btn{margin-top:48px;background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:var(--mono);font-size:13px;letter-spacing:0.15em;text-transform:uppercase;padding:16px 38px;cursor:pointer;position:relative;transition:all 0.25s ease;opacity:0;animation:rise 0.8s ease forwards 0.7s;border-radius:var(--radius);}
+.enter-btn:hover{background:var(--accent);color:var(--bg);}
+[data-theme="dawn"] .enter-btn:hover{color:#fff;}
+[data-theme="noir"] .enter-btn:hover{color:#000;}
+.enter-btn:focus-visible{outline:2px solid var(--accent);outline-offset:4px;}
 
-  .calc-wrap{
-    max-width:1180px;
-    margin:0 auto;
-    padding:40px 24px 0;
-    display:grid;
-    grid-template-columns:360px 1fr;
-    gap:28px;
-    align-items:start;
-  }
-  @media (max-width:880px){
-    .calc-wrap{grid-template-columns:1fr;}
-  }
+@keyframes rise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+@media (prefers-reduced-motion: reduce){.ticker-track{animation:none;}.brand-mark,h1.title,.subtitle,.quote-box,.enter-btn{animation:none;opacity:1;}}
 
-  .panel{
-    background:var(--panel);
-    border:1px solid var(--line);
-  }
-  .panel-head{
-    padding:16px 20px;
-    border-bottom:1px solid var(--line);
-    display:flex;align-items:center;justify-content:space-between;
-  }
-  .panel-head .eyebrow{
-    font-family:var(--mono);font-size:11px;letter-spacing:0.14em;
-    color:var(--muted-dim);text-transform:uppercase;
-  }
-  .panel-body{padding:22px 20px;}
+/* ================= CALCULATOR SHELL ================= */
+#screen-calc{padding-bottom:70px;}
+.calc-header{border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;background:var(--surface);position:sticky;top:0;z-index:30;gap:16px;flex-wrap:wrap;}
+.calc-header .left-group{display:flex;align-items:center;gap:16px;}
+.calc-header .brand{font-family:var(--mono);font-size:13px;letter-spacing:0.2em;color:var(--accent);white-space:nowrap;}
+.back-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:var(--mono);font-size:11px;letter-spacing:0.08em;padding:9px 16px;cursor:pointer;transition:all 0.2s ease;text-transform:uppercase;border-radius:var(--radius);}
+.back-btn:hover{border-color:var(--accent);color:var(--accent);}
 
-  .field{margin-bottom:20px;}
-  .field:last-child{margin-bottom:0;}
-  .field label{
-    display:block;font-family:var(--mono);font-size:11px;
-    letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;margin-bottom:9px;
-  }
-  .field-hint{font-family:var(--body);font-size:11.5px;color:var(--muted-dim);margin-top:7px;line-height:1.4;}
-  .input-row{display:flex;align-items:stretch;border:1px solid var(--line);background:var(--ink);}
-  .input-row .prefix{
-    display:flex;align-items:center;padding:0 12px;
-    font-family:var(--mono);font-size:13px;color:var(--muted-dim);
-    border-right:1px solid var(--line);background:var(--line-soft);
-  }
-  .input-row input{
-    flex:1;background:transparent;border:none;color:var(--paper);
-    font-family:var(--mono);font-size:16px;padding:13px 12px;width:100%;min-width:0;
-  }
-  .input-row input:focus{outline:none;background:rgba(232,163,61,0.05);}
-  .input-row:focus-within{border-color:var(--amber);}
+/* ---- Segment tabs ---- */
+.segment-tabs{display:flex;gap:2px;background:var(--bg);border:1px solid var(--border);padding:3px;border-radius:var(--radius-lg);}
+.segment-tab{
+  background:none;border:none;color:var(--text-dim);font-family:var(--mono);font-size:12px;
+  letter-spacing:0.08em;padding:10px 18px;cursor:pointer;transition:all 0.2s ease;
+  text-transform:uppercase;border-radius:calc(var(--radius-lg) - 2px);
+}
+.segment-tab.on{background:var(--accent);color:var(--bg);}
+[data-theme="dawn"] .segment-tab.on{color:#fff;}
+[data-theme="noir"] .segment-tab.on{color:#000;}
+.segment-tab:not(.on):hover{color:var(--text);}
 
-  .toggle-group{display:flex;border:1px solid var(--line);}
-  .toggle-group button{
-    flex:1;background:var(--ink);border:none;color:var(--muted);
-    font-family:var(--mono);font-size:11.5px;letter-spacing:0.06em;
-    padding:11px 8px;cursor:pointer;text-transform:uppercase;
-    border-right:1px solid var(--line);transition:all 0.2s ease;
-  }
-  .toggle-group button:last-child{border-right:none;}
-  .toggle-group button.on{background:var(--amber);color:var(--ink);font-weight:600;}
-  .toggle-group button:not(.on):hover{color:var(--paper);}
+.calc-wrap{max-width:1220px;margin:0 auto;padding:32px 24px 0;display:grid;grid-template-columns:380px 1fr;gap:24px;align-items:start;}
+@media (max-width:900px){.calc-wrap{grid-template-columns:1fr;} .calc-header{position:static;}}
 
-  .direction-flag{
-    margin-top:18px;padding:12px 14px;font-family:var(--mono);font-size:12px;
-    letter-spacing:0.05em;border-left:2px solid var(--amber);background:var(--line-soft);color:var(--muted);
-  }
-  .direction-flag b{color:var(--paper);}
-  .direction-flag.long{border-color:var(--profit);}
-  .direction-flag.short{border-color:var(--risk);}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
+.panel-head{padding:15px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.panel-head .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:0.14em;color:var(--text-faint);text-transform:uppercase;}
+.panel-body{padding:20px;}
+.panel + .panel{margin-top:20px;}
 
-  /* results side */
-  .stat-strip{
-    display:grid;grid-template-columns:repeat(4,1fr);
-    border:1px solid var(--line);margin-bottom:22px;
-  }
-  .stat{
-    padding:18px 16px;border-right:1px solid var(--line);
-  }
-  .stat:last-child{border-right:none;}
-  .stat .k{font-family:var(--mono);font-size:10.5px;letter-spacing:0.1em;color:var(--muted-dim);text-transform:uppercase;margin-bottom:9px;}
-  .stat .v{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--paper);}
-  .stat .v.amber{color:var(--amber);}
-  .stat .v.profit{color:var(--profit);}
-  .stat .v.risk{color:var(--risk);}
-  .stat .sub{font-family:var(--body);font-size:11px;color:var(--muted-dim);margin-top:5px;}
-  @media (max-width:640px){.stat-strip{grid-template-columns:repeat(2,1fr);}
-    .stat:nth-child(2){border-right:none;}
-    .stat:nth-child(3),.stat:nth-child(4){border-top:1px solid var(--line);}}
+.field{margin-bottom:18px;}
+.field:last-child{margin-bottom:0;}
+.field label{display:block;font-family:var(--mono);font-size:11px;letter-spacing:0.08em;color:var(--text-dim);text-transform:uppercase;margin-bottom:8px;}
+.field-hint{font-family:var(--body);font-size:11.5px;color:var(--text-faint);margin-top:6px;line-height:1.4;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 
-  /* R-ladder — signature element */
-  .ladder-wrap{padding:26px 20px 20px;}
-  .ladder-title{font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:var(--muted-dim);text-transform:uppercase;margin-bottom:22px;}
-  .ladder{position:relative;height:6px;background:var(--line);margin:0 6px 10px;border-radius:2px;}
-  .ladder-fill-risk{position:absolute;top:0;bottom:0;background:var(--risk-dim);border-radius:2px;}
-  .ladder-fill-reward{position:absolute;top:0;bottom:0;background:var(--profit-dim);border-radius:2px;}
-  .ladder-tick{
-    position:absolute;top:-5px;width:2px;height:16px;background:var(--muted-dim);
-  }
-  .ladder-tick.entry{background:var(--paper);width:2px;}
-  .ladder-tick.sl{background:var(--risk);}
-  .ladder-tick.tp{background:var(--profit);}
-  .ladder-labels{position:relative;height:56px;margin:0 6px;}
-  .ladder-label{
-    position:absolute;transform:translateX(-50%);text-align:center;
-    font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;
-  }
-  .ladder-label .lp{font-weight:700;font-size:12px;display:block;margin-bottom:3px;}
-  .ladder-label.sl .lp{color:var(--risk);}
-  .ladder-label.entry .lp{color:var(--paper);}
-  .ladder-label.tp .lp{color:var(--profit);}
-  .ladder-label .lr{font-size:9.5px;color:var(--muted-dim);}
+input[type="number"], input[type="text"], select{
+  width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+  font-family:var(--mono);font-size:14px;padding:11px 12px;border-radius:var(--radius);
+  transition:border-color 0.2s ease;
+}
+input[type="number"]:focus, input[type="text"]:focus, select:focus{outline:none;border-color:var(--accent);}
+input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 
-  table.tp-table{width:100%;border-collapse:collapse;margin-top:6px;}
-  table.tp-table th{
-    text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;
-    color:var(--muted-dim);text-transform:uppercase;padding:12px 14px;border-bottom:1px solid var(--line);
-  }
-  table.tp-table td{
-    font-family:var(--mono);font-size:14px;padding:13px 14px;border-bottom:1px solid var(--line-soft);color:var(--paper);
-  }
-  table.tp-table tr:last-child td{border-bottom:none;}
-  table.tp-table td.r-badge{color:var(--profit);font-weight:600;}
-  table.tp-table td.tp-price{font-weight:700;font-size:15px;}
-  table.tp-table td.dim{color:var(--muted);}
-  table.tp-table tr:hover td{background:rgba(232,163,61,0.03);}
+.pill-toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.pill-toggle button{flex:1;background:var(--bg);border:none;color:var(--text-dim);font-family:var(--mono);font-size:11.5px;letter-spacing:0.05em;padding:10px 8px;cursor:pointer;transition:all 0.2s ease;text-transform:uppercase;}
+.pill-toggle button.on{background:var(--accent);color:var(--bg);}
+[data-theme="dawn"] .pill-toggle button.on{color:#fff;}
+[data-theme="noir"] .pill-toggle button.on{color:#000;}
+.pill-toggle button:not(:last-child){border-right:1px solid var(--border);}
 
-  .footnote{
-    font-family:var(--body);font-size:11.5px;color:var(--muted-dim);
-    padding:16px 20px 0;line-height:1.6;
-  }
+/* segment-specific field groups */
+.seg-only{display:none;}
+.seg-only.show{display:block;}
 
-  .quote-strip-calc{
-    max-width:1180px;margin:36px auto 0;padding:0 24px;
-    font-family:var(--display);font-size:14px;color:var(--muted-dim);
-    text-align:center;font-style:normal;
-  }
-  .quote-strip-calc span{color:var(--amber);}
+/* ---- Results side ---- */
+.hero-pnl{padding:26px 24px;text-align:center;position:relative;}
+.hero-pnl .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:0.14em;color:var(--text-faint);text-transform:uppercase;margin-bottom:10px;}
+.hero-pnl .amount{font-family:var(--display);font-weight:700;font-size:clamp(32px,5vw,52px);line-height:1;}
+.hero-pnl .amount.profit{color:var(--profit);}
+.hero-pnl .amount.risk{color:var(--risk);}
+.hero-pnl .sub{font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:10px;}
+
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border);}
+.stat-cell{background:var(--surface);padding:16px 14px;}
+.stat-cell .k{font-family:var(--mono);font-size:10px;letter-spacing:0.06em;color:var(--text-faint);text-transform:uppercase;margin-bottom:6px;}
+.stat-cell .v{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--text);}
+.stat-cell .v.profit{color:var(--profit);}
+.stat-cell .v.risk{color:var(--risk);}
+@media (max-width:520px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
+
+.direction-flag{margin:0 20px 0;padding:11px 16px;border:1px dashed var(--border);border-radius:var(--radius);text-align:center;font-family:var(--mono);font-size:12px;color:var(--text-dim);letter-spacing:0.04em;}
+.direction-flag.long{border-color:var(--profit-dim);color:var(--profit);background:var(--profit-dim);}
+.direction-flag.short{border-color:var(--risk-dim);color:var(--risk);background:var(--risk-dim);}
+.direction-flag b{letter-spacing:0.1em;}
+
+/* charges table */
+table.charges-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;}
+table.charges-table th{text-align:left;font-size:10px;letter-spacing:0.08em;color:var(--text-faint);text-transform:uppercase;padding:10px 20px;border-bottom:1px solid var(--border);font-weight:500;}
+table.charges-table td{padding:10px 20px;border-bottom:1px solid var(--border-soft);color:var(--text-dim);}
+table.charges-table tr:last-child td{border-bottom:none;}
+table.charges-table td.label{color:var(--text);}
+table.charges-table td.val{text-align:right;color:var(--text);}
+table.charges-table tr.total td{padding-top:13px;font-weight:700;color:var(--text);border-top:1px solid var(--border);}
+table.charges-table tr.total td.val{color:var(--risk);}
+
+/* R-ladder table */
+table.tp-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;}
+table.tp-table th{text-align:left;font-size:10px;letter-spacing:0.06em;color:var(--text-faint);text-transform:uppercase;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:500;}
+table.tp-table td{padding:10px 14px;border-bottom:1px solid var(--border-soft);color:var(--text-dim);}
+table.tp-table tr:last-child td{border-bottom:none;}
+table.tp-table td.r-badge{font-weight:700;color:var(--accent);}
+table.tp-table td.tp-price{color:var(--text);}
+table.tp-table td.net-pos{color:var(--profit);font-weight:600;}
+table.tp-table td.net-neg{color:var(--risk);font-weight:600;}
+table.tp-table td.dim{color:var(--text-faint);}
+@media (max-width:640px){table.tp-table{font-size:11px;} table.tp-table th, table.tp-table td, table.charges-table th, table.charges-table td{padding:8px 10px;}}
+
+.footnote{padding:16px 20px;font-family:var(--body);font-size:11.5px;color:var(--text-faint);line-height:1.55;border-top:1px solid var(--border);}
+.footnote b{color:var(--text-dim);}
+
+.calc-footer-quote{max-width:1220px;margin:44px auto 0;padding:0 24px;text-align:center;font-family:var(--display);font-size:15px;color:var(--text-faint);font-style:normal;}
+.calc-footer-quote span{color:var(--accent);}
 </style>
 </head>
 <body>
 
-<!-- ============ LANDING SCREEN ============ -->
-<section id="screen-landing" class="screen active">
-  <div class="ticker">
-    <div class="ticker-track" id="ticker-top"></div>
+<!-- ================= LANDING SCREEN ================= -->
+<div class="screen active" id="screen-landing">
+  <div class="landing-topbar">
+    <div class="theme-switch" id="theme-switch-landing" aria-label="Theme switcher"></div>
   </div>
 
+  <div class="ticker"><div class="ticker-track" id="ticker-top"></div></div>
+
   <div class="landing-main">
-    <div class="brand-mark">Position Sizing &nbsp;·&nbsp; Defined Risk &nbsp;·&nbsp; Personal Desk</div>
-    <h1 class="title">RISK<em>DESK</em></h1>
-    <p class="subtitle">You don't control where price goes. You control how much you lose finding out. Size the trade before you take it.</p>
+    <div class="brand-mark">Risk Desk</div>
+    <h1 class="title">Size the trade.<br>Know the <em>real</em> P&amp;L.</h1>
+    <p class="subtitle">A defined-risk ledger for cash, futures &amp; options — position sizing, R-multiple targets and true net P&amp;L after Dhan brokerage, STT, exchange charges and GST.</p>
 
     <div class="quote-box">
       <div class="quote-rule"></div>
-      <div id="quote-text">Loading...</div>
-      <div id="quote-index">Q. 001 / 100</div>
+      <div id="quote-text"></div>
+      <div id="quote-index"></div>
     </div>
 
-    <button class="enter-btn" id="enter-btn">Enter the Desk →</button>
+    <button class="enter-btn" id="enter-btn">Enter Desk →</button>
   </div>
 
-  <div class="ticker bottom-line reverse">
-    <div class="ticker-track" id="ticker-bottom"></div>
-  </div>
-</section>
+  <div class="ticker bottom-line reverse"><div class="ticker-track" id="ticker-bottom"></div></div>
+</div>
 
-<!-- ============ CALCULATOR SCREEN ============ -->
-<section id="screen-calc" class="screen">
+<!-- ================= CALCULATOR SCREEN ================= -->
+<div class="screen" id="screen-calc">
   <div class="calc-header">
-    <div class="brand">RISK<span style="color:var(--paper)">DESK</span></div>
-    <button class="back-btn" id="back-btn">← Welcome</button>
+    <div class="left-group">
+      <button class="back-btn" id="back-btn">← Back</button>
+      <span class="brand">RISK DESK</span>
+    </div>
+    <div class="segment-tabs" id="segment-tabs">
+      <button class="segment-tab on" data-seg="cash">Cash</button>
+      <button class="segment-tab" data-seg="futures">Futures</button>
+      <button class="segment-tab" data-seg="options">Options</button>
+    </div>
+    <div class="theme-switch" id="theme-switch-calc"></div>
   </div>
 
   <div class="calc-wrap">
-    <!-- INPUT PANEL -->
-    <div class="panel">
-      <div class="panel-head"><span class="eyebrow">Trade Inputs</span></div>
-      <div class="panel-body">
+    <!-- ===== LEFT: INPUTS ===== -->
+    <div>
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">Trade Setup</span></div>
+        <div class="panel-body">
 
-        <div class="field">
-          <label for="capital">Total Capital</label>
-          <div class="input-row">
-            <span class="prefix">₹</span>
-            <input type="number" id="capital" value="50000" inputmode="decimal" step="any">
+          <!-- direction / trade type -->
+          <div class="field seg-only show" data-seg="cash">
+            <label>Cash Trade Type</label>
+            <div class="pill-toggle" id="cash-type-toggle">
+              <button data-val="delivery" class="on">Delivery</button>
+              <button data-val="intraday">Intraday</button>
+            </div>
           </div>
-        </div>
 
-        <div class="field">
-          <label>Risk Input Mode</label>
-          <div class="toggle-group" id="risk-mode-toggle">
-            <button class="on" data-mode="amount">₹ Amount</button>
-            <button data-mode="percent">% of Capital</button>
+          <div class="field" id="direction-field-wrap" style="display:none;">
+            <label>Direction</label>
+            <div class="pill-toggle" id="direction-toggle">
+              <button data-val="long" class="on">Long (Buy first)</button>
+              <button data-val="short">Short (Sell first)</button>
+            </div>
           </div>
-        </div>
 
-        <div class="field" id="risk-amount-field">
-          <label for="risk-amount">Risk Amount</label>
-          <div class="input-row">
-            <span class="prefix">₹</span>
-            <input type="number" id="risk-amount" value="500" inputmode="decimal" step="any">
+          <div class="field seg-only show" data-seg="options">
+            <label>Option Right</label>
+            <div class="pill-toggle" id="option-right-toggle">
+              <button data-val="CE" class="on">Call (CE)</button>
+              <button data-val="PE">Put (PE)</button>
+            </div>
           </div>
-          <div class="field-hint" id="risk-pct-hint"></div>
-        </div>
 
-        <div class="field" id="risk-percent-field" style="display:none;">
-          <label for="risk-percent">Risk %</label>
-          <div class="input-row">
-            <input type="number" id="risk-percent" value="1" inputmode="decimal" step="any">
-            <span class="prefix" style="border-right:none;border-left:1px solid var(--line);">%</span>
+          <div class="field">
+            <label>Capital (₹)</label>
+            <input type="number" id="capital" value="200000" min="0" inputmode="decimal">
           </div>
-          <div class="field-hint" id="risk-amt-hint"></div>
-        </div>
 
-        <div class="field">
-          <label for="entry">Entry Price</label>
-          <div class="input-row">
-            <span class="prefix">₹</span>
-            <input type="number" id="entry" value="173.89" inputmode="decimal" step="any">
+          <div class="field">
+            <label>Risk Mode</label>
+            <div class="pill-toggle" id="risk-mode-toggle">
+              <button data-mode="amount" class="on">₹ Amount</button>
+              <button data-mode="percent">% of Capital</button>
+            </div>
           </div>
-        </div>
 
-        <div class="field">
-          <label for="sl">Stop Loss Price</label>
-          <div class="input-row">
-            <span class="prefix">₹</span>
-            <input type="number" id="sl" value="171.50" inputmode="decimal" step="any">
+          <div class="field" id="risk-amount-field">
+            <label>Risk Amount (₹)</label>
+            <input type="number" id="risk-amount" value="2000" min="0" inputmode="decimal">
+            <div class="field-hint" id="risk-pct-hint"></div>
           </div>
-        </div>
-
-        <div class="field">
-          <label for="lotsize">Lot Size <span style="color:var(--muted-dim);text-transform:none;">(optional, for F&O)</span></label>
-          <div class="input-row">
-            <input type="number" id="lotsize" placeholder="e.g. 1500 — leave blank for equity" inputmode="numeric" step="1">
+          <div class="field" id="risk-percent-field" style="display:none;">
+            <label>Risk % of Capital</label>
+            <input type="number" id="risk-percent" value="1" min="0" step="0.1" inputmode="decimal">
+            <div class="field-hint" id="risk-amt-hint"></div>
           </div>
-        </div>
 
-        <div class="direction-flag" id="direction-flag">— enter entry &amp; SL —</div>
+          <div class="field-row">
+            <div class="field">
+              <label id="entry-label">Entry Price</label>
+              <input type="number" id="entry" placeholder="0.00" min="0" step="0.05" inputmode="decimal">
+            </div>
+            <div class="field">
+              <label id="sl-label">Stop Loss</label>
+              <input type="number" id="sl" placeholder="0.00" min="0" step="0.05" inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="field">
+            <label id="exit-label">Exit / Target Price (for real P&amp;L)</label>
+            <input type="number" id="exit-price" placeholder="0.00" min="0" step="0.05" inputmode="decimal">
+            <div class="field-hint">Leave blank to auto-use the 1R target below.</div>
+          </div>
+
+          <div class="field seg-only" data-seg="futures">
+            <label>Lot Size (Futures)</label>
+            <input type="number" id="lotsize-fut" placeholder="e.g. 25" min="1" inputmode="numeric">
+          </div>
+          <div class="field seg-only" data-seg="options">
+            <label>Lot Size (Options)</label>
+            <input type="number" id="lotsize-opt" placeholder="e.g. 75" min="1" inputmode="numeric">
+          </div>
+
+          <div class="field seg-only" data-seg="cash">
+            <label>Women Trader Discount (Dhan −50%)</label>
+            <div class="pill-toggle" id="women-toggle">
+              <button data-val="no" class="on">No</button>
+              <button data-val="yes">Yes</button>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
 
-    <!-- RESULTS -->
+    <!-- ===== RIGHT: RESULTS ===== -->
     <div>
-      <div class="stat-strip">
-        <div class="stat">
-          <div class="k">Quantity</div>
-          <div class="v amber" id="out-qty">—</div>
-          <div class="sub" id="out-qty-sub">&nbsp;</div>
-        </div>
-        <div class="stat">
-          <div class="k">Risk / Share</div>
-          <div class="v" id="out-perunit">—</div>
-        </div>
-        <div class="stat">
-          <div class="k">Actual Risk</div>
-          <div class="v risk" id="out-actual-risk">—</div>
-          <div class="sub" id="out-risk-pct">&nbsp;</div>
-        </div>
-        <div class="stat">
-          <div class="k">Capital Deployed</div>
-          <div class="v" id="out-deployed">—</div>
-          <div class="sub" id="out-deployed-pct">&nbsp;</div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">Position &amp; Direction</span></div>
+        <div class="direction-flag" id="direction-flag" style="margin-top:20px;">— enter entry &amp; SL —</div>
+        <div class="stat-grid">
+          <div class="stat-cell"><div class="k">Quantity</div><div class="v" id="out-qty">—</div></div>
+          <div class="stat-cell"><div class="k">Sub-unit</div><div class="v" id="out-qty-sub" style="font-size:12px;">—</div></div>
+          <div class="stat-cell"><div class="k">Risk / Unit</div><div class="v" id="out-perunit">—</div></div>
+          <div class="stat-cell"><div class="k">Actual Risk</div><div class="v risk" id="out-actual-risk">—</div></div>
+          <div class="stat-cell"><div class="k">Risk % Cap.</div><div class="v" id="out-risk-pct">—</div></div>
+          <div class="stat-cell"><div class="k">Capital Deployed</div><div class="v" id="out-deployed">—</div></div>
         </div>
       </div>
 
       <div class="panel">
-        <div class="panel-head"><span class="eyebrow">Risk / Reward Ladder</span></div>
-        <div class="ladder-wrap">
-          <div class="ladder-title">Stop → Entry → Targets, scaled by distance</div>
-          <div class="ladder" id="ladder-track">
-            <div class="ladder-fill-risk" id="fill-risk"></div>
-            <div class="ladder-fill-reward" id="fill-reward"></div>
-          </div>
-          <div class="ladder-labels" id="ladder-labels"></div>
+        <div class="panel-head">
+          <span class="eyebrow">Real Net P&amp;L — at Exit Price</span>
+          <span class="eyebrow" id="charge-broker-tag">DHAN RATE CARD</span>
         </div>
+        <div class="hero-pnl">
+          <div class="eyebrow">Net P&amp;L after all charges</div>
+          <div class="amount" id="out-net-pnl">₹—</div>
+          <div class="sub" id="out-net-pnl-sub">enter entry, SL &amp; exit to compute</div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-cell"><div class="k">Gross P&amp;L</div><div class="v" id="out-gross-pnl">—</div></div>
+          <div class="stat-cell"><div class="k">Total Charges</div><div class="v risk" id="out-total-charges">—</div></div>
+          <div class="stat-cell"><div class="k">Net R-Multiple</div><div class="v" id="out-net-r">—</div></div>
+        </div>
+        <table class="charges-table" id="charges-table">
+          <thead><tr><th>Charge Head</th><th style="text-align:right;">Amount</th></tr></thead>
+          <tbody id="charges-tbody"></tbody>
+        </table>
+        <div class="footnote">Charges modeled on <b>Dhan's</b> published rate card and NSE/SEBI statutory rates (incl. Budget 2026 F&amp;O STT revision). Indicative — always reconcile against your contract note.</div>
+      </div>
 
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">R-Multiple Target Ladder — Net of Charges</span></div>
+        <div style="overflow-x:auto;">
         <table class="tp-table">
-          <thead>
-            <tr>
-              <th>Level</th>
-              <th>R-Multiple</th>
-              <th>Target Price</th>
-              <th>Gain / Share</th>
-              <th>Profit at Qty</th>
-            </tr>
-          </thead>
+          <thead><tr><th>TP</th><th>R</th><th>Price</th><th>Gross P&amp;L</th><th>Charges</th><th>Net P&amp;L</th></tr></thead>
           <tbody id="tp-table-body"></tbody>
         </table>
-
-        <p class="footnote">Targets are set at 1R–5R (multiples of your per-share risk) from entry, in the direction of your trade. Quantity is floored to a whole share/unit — and to whole lots if a lot size is set — so actual risk may land slightly under your risk input, never over.</p>
+        </div>
       </div>
+
     </div>
   </div>
 
-  <div class="quote-strip-calc" id="calc-quote">&nbsp;</div>
-</section>
+  <div class="calc-footer-quote" id="calc-quote"></div>
+</div>
 
 <script>
-/* ============ 100 TRADING / MINDSET QUOTES ============ */
+/* ============================================================
+   QUOTES
+   ============================================================ */
 const QUOTES = [
-"You don't need to be right. You need to be disciplined.",
-"Risk comes first. The trade idea is a distant second.",
-"Every position sizing decision is a risk decision in disguise.",
-"The market doesn't know you're in it. Trade like it doesn't care.",
-"Cut losses like a surgeon. Let winners run like a spectator.",
-"Your stop loss is a promise you make before emotion shows up.",
-"Discipline is remembering what you decided when you were calm.",
-"Amateurs think about how much they can make. Professionals think about how much they can lose.",
-"A defined risk trade is a decision you can defend at 3 a.m.",
-"Position size is the only variable you fully control.",
-"The market rewards patience and punishes urgency.",
-"Plan the risk. Let the reward take care of itself.",
-"Small losses are the cost of admission. Big losses are the cost of ego.",
-"You can be wrong on direction and still be right on process.",
-"Revenge trading is grief wearing a trading terminal.",
-"The trade you skip is sometimes the best trade you make.",
-"Capital preservation is offense disguised as defense.",
-"Every trader has a strategy until the stop loss gets hit.",
-"Conviction without a stop loss is just hope with extra steps.",
-"The size of your risk should never depend on the size of your confidence.",
-"Overtrading is boredom pretending to be opportunity.",
-"A good exit plan turns fear into a checklist.",
-"Consistency is built in the trades that felt boring.",
-"You don't rise to the level of your target. You fall to the level of your risk management.",
-"The account that survives is the account that compounds.",
-"Trading well is 10% analysis and 90% behaviour around that analysis.",
-"Your P&L is a lagging indicator of your discipline.",
-"The market will test your plan before it rewards it.",
-"Sizing down is not weakness. It is how you stay in the game long enough to be right.",
-"Every trade has three outcomes: win, lose, or learn. Only losing without learning is a true loss.",
-"The stop loss is not admitting defeat. It is refusing to gamble.",
-"Emotional trades are loud. Planned trades are quiet.",
-"You can't control the market. You can control your exposure to it.",
-"Risk what you can lose without changing how you sleep.",
-"Good traders think in probabilities, not certainties.",
-"The first loss is usually the cheapest loss.",
-"A plan without a defined risk is just an opinion with money attached.",
-"Patience is a position too.",
-"Your worst trading days are usually the days you didn't want to follow the plan.",
-"Process over outcome, every single time, especially when it's inconvenient.",
-"The market has no memory of your last trade. Neither should you.",
-"Chasing price is how disciplined plans quietly die.",
-"Every professional was once an amateur who refused to blow up their account.",
-"You trade the market in front of you, not the one in your head.",
-"Sizing a trade correctly makes being wrong survivable.",
-"Confidence is earned in the risk you took, not the profit you made.",
-"The best traders are professional loss-takers first, profit-takers second.",
-"Fear of missing out has closed more accounts than fear of losing.",
-"A trading plan you can't follow under pressure isn't a plan.",
-"The edge is in the exit, not just the entry.",
-"Protect the capital and the opportunities will keep coming.",
-"Your risk per trade should survive twenty losses in a row.",
-"Never let a winning streak write cheques your risk management can't cash.",
-"The goal isn't to be right every time. The goal is to lose small and win big enough.",
-"A calm trader reads price. An anxious trader reads their P&L.",
-"Every large loss started as a small loss someone refused to take.",
-"Sizing is strategy. Everything else is timing.",
-"The market pays for patience, not for prediction.",
-"Trading is the only business where you can be right and still lose money if sized wrong.",
-"Set the stop before the excitement. Move the target after the plan.",
-"A trader who can't define risk hasn't finished planning the trade.",
-"The account grows in the trades you didn't take.",
-"You are not your last trade.",
-"There is no such thing as a sure thing, only a well-sized bet.",
-"Losses are tuition. Overpaying tuition is optional.",
-"Trade your plan, not your prediction.",
-"The market humbles ego and rewards humility.",
-"Position sizing is where trading psychology becomes arithmetic.",
-"When in doubt, size down. Clarity returns with less on the line.",
-"The stop loss protects the account. The mindset protects the stop loss.",
-"Every green quarter is built on a hundred small, boring, disciplined trades.",
-"Risk management is the only strategy that works in every market condition.",
-"Don't average down on a broken thesis. Averaging down is not conviction, it's denial.",
-"Your biggest edge is knowing exactly how much you're willing to lose before you click buy.",
-"The market doesn't owe you a recovery. Manage risk like it never will.",
-"A trader who fears losing money has already lost their edge.",
-"Trading small when uncertain is how you stay big when it matters.",
-"The stop loss is the exit you choose. The margin call is the exit chosen for you.",
-"Great traders are boring in exactly the right moments.",
-"Every setup looks perfect until it isn't. That's why the stop exists.",
-"Risk first, reward second, ego last.",
-"The market is a mirror. It reflects exactly how disciplined you actually are.",
-"Winning is temporary. Process is permanent.",
-"You don't need a bigger position. You need a better plan.",
-"A trade well-sized is a trade you can walk away from without checking every five minutes.",
-"The best risk management is the kind you never have to think about because it's already built into the trade.",
-"Trading is a game of survival first, profit second.",
-"Every stop loss hit is data, not a verdict on your worth.",
-"Discipline is choosing what you want most over what you want now.",
-"The market rewards those who show up the same way every single day.",
-"There's no prize for the biggest position. There's a prize for the longest career.",
-"Cut the loss. Protect the next hundred trades.",
-"A single undisciplined trade can undo fifty disciplined ones.",
-"Know your exit before you know your entry.",
+"Risk comes from not knowing what you are doing.",
+"Amateurs think about how much money they can make. Professionals think about how much they can lose.",
 "The size of the trade should never be bigger than your ability to stay calm.",
 "Consistency beats intensity in every market cycle.",
 "The market can stay irrational, but your risk sizing should never be.",
@@ -605,7 +433,26 @@ const QUOTES = [
 "You manage risk before the trade. You manage emotion during it.",
 "The account curve reflects the mind that built it.",
 "Every professional trader's superpower is the trade they didn't take.",
-"Sizing correctly is how conviction and humility coexist."
+"Sizing correctly is how conviction and humility coexist.",
+"Charges are certain. Profit is not. Plan for both.",
+"Your edge is only as real as your net P&L after costs.",
+"A stop loss is not a prediction. It is a promise to yourself.",
+"Position size is the only variable you fully control.",
+"Slippage and charges are the tax on impatience.",
+"Every R you don't lose is an R you get to compound.",
+"Discipline is remembering what you decided when you're calm.",
+"The scoreboard doesn't care how right you felt.",
+"Cut the loss, keep the lesson.",
+"Capital preservation is the first strategy, not the last resort.",
+"A good exit plan is worth more than a clever entry.",
+"Overtrading is fear wearing the costume of conviction.",
+"The market pays for patience, not for prediction.",
+"Know your breakeven before you know your dream.",
+"Small, repeatable edges beat big, occasional wins.",
+"A trade well-sized survives a thesis that's wrong.",
+"Process over outcome, every single session.",
+"The best traders are professional risk managers first.",
+"Volatility is the price you pay for opportunity.",
 ];
 
 function shuffledIndices(n){
@@ -616,26 +463,22 @@ function shuffledIndices(n){
   }
   return arr;
 }
-
-/* ---------- ticker tapes ---------- */
 function buildTicker(elId, count){
   const el = document.getElementById(elId);
   const idxs = shuffledIndices(QUOTES.length).slice(0,count);
   const html = idxs.map(i => `<span>${QUOTES[i]}</span>`).join('');
-  el.innerHTML = html + html; // duplicate for seamless loop
+  el.innerHTML = html + html;
 }
-buildTicker('ticker-top', 18);
-buildTicker('ticker-bottom', 18);
+buildTicker('ticker-top', 16);
+buildTicker('ticker-bottom', 16);
 
-/* ---------- rotating hero quote ---------- */
 const order = shuffledIndices(QUOTES.length);
 let qPos = 0;
 const quoteTextEl = document.getElementById('quote-text');
 const quoteIndexEl = document.getElementById('quote-index');
-
 function showQuote(){
   const idx = order[qPos];
-  quoteTextEl.textContent = "“" + QUOTES[idx] + "”";
+  quoteTextEl.textContent = "\u201C" + QUOTES[idx] + "\u201D";
   quoteIndexEl.textContent = "Q. " + String(idx+1).padStart(3,'0') + " / " + QUOTES.length;
 }
 function nextQuote(){
@@ -648,12 +491,38 @@ function nextQuote(){
 }
 showQuote();
 let quoteTimer = setInterval(nextQuote, 5200);
-
-/* footer quote on calc screen — static pick */
 document.getElementById('calc-quote').innerHTML =
-  '<span>“</span>' + QUOTES[Math.floor(Math.random()*QUOTES.length)] + '<span>”</span>';
+  '<span>\u201C</span>' + QUOTES[Math.floor(Math.random()*QUOTES.length)] + '<span>\u201D</span>';
 
-/* ---------- screen switching ---------- */
+/* ============================================================
+   THEME SWITCHER
+   ============================================================ */
+const THEMES = ['terminal','dawn','slate','noir'];
+function buildThemeSwitch(containerId){
+  const el = document.getElementById(containerId);
+  el.innerHTML = THEMES.map(t =>
+    `<button class="theme-dot ${t} ${t==='terminal'?'active':''}" data-theme-btn="${t}" title="${t[0].toUpperCase()+t.slice(1)} theme" aria-label="${t} theme"></button>`
+  ).join('');
+}
+buildThemeSwitch('theme-switch-landing');
+buildThemeSwitch('theme-switch-calc');
+
+function setTheme(name){
+  document.documentElement.setAttribute('data-theme', name);
+  document.querySelectorAll('.theme-dot').forEach(d=>{
+    d.classList.toggle('active', d.dataset.themeBtn === name);
+  });
+}
+document.querySelectorAll('.theme-switch').forEach(sw=>{
+  sw.addEventListener('click', e=>{
+    const btn = e.target.closest('.theme-dot');
+    if(btn) setTheme(btn.dataset.themeBtn);
+  });
+});
+
+/* ============================================================
+   SCREEN SWITCHING
+   ============================================================ */
 const landing = document.getElementById('screen-landing');
 const calc = document.getElementById('screen-calc');
 document.getElementById('enter-btn').addEventListener('click', ()=>{
@@ -670,22 +539,91 @@ document.getElementById('back-btn').addEventListener('click', ()=>{
   window.scrollTo(0,0);
 });
 
-/* ============ CALCULATOR LOGIC ============ */
-const fmt = new Intl.NumberFormat('en-IN', {maximumFractionDigits:2});
-const fmtInt = new Intl.NumberFormat('en-IN');
+/* ============================================================
+   SEGMENT SWITCHING
+   ============================================================ */
+let segment = 'cash'; // cash | futures | options
+const segTabs = document.querySelectorAll('.segment-tab');
+segTabs.forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    segTabs.forEach(t=>t.classList.remove('on'));
+    tab.classList.add('on');
+    segment = tab.dataset.seg;
+    applySegmentVisibility();
+    compute();
+  });
+});
+function applySegmentVisibility(){
+  document.querySelectorAll('.seg-only').forEach(el=>{
+    el.classList.toggle('show', el.dataset.seg === segment);
+  });
+  const dirWrap = document.getElementById('direction-field-wrap');
+  dirWrap.style.display = segment === 'cash' ? 'none' : 'block';
 
-const capitalEl = document.getElementById('capital');
-const riskAmountEl = document.getElementById('risk-amount');
-const riskPercentEl = document.getElementById('risk-percent');
-const entryEl = document.getElementById('entry');
-const slEl = document.getElementById('sl');
-const lotsizeEl = document.getElementById('lotsize');
+  const entryLabel = document.getElementById('entry-label');
+  const slLabel = document.getElementById('sl-label');
+  const exitLabel = document.getElementById('exit-label');
+  if(segment === 'options'){
+    entryLabel.textContent = 'Entry Premium';
+    slLabel.textContent = 'Stop Premium';
+    exitLabel.textContent = 'Exit / Target Premium (for real P&L)';
+  } else {
+    entryLabel.textContent = 'Entry Price';
+    slLabel.textContent = 'Stop Loss';
+    exitLabel.textContent = 'Exit / Target Price (for real P&L)';
+  }
+  document.getElementById('charge-broker-tag').textContent =
+    segment === 'cash' ? (cashType === 'delivery' ? 'DHAN · DELIVERY' : 'DHAN · INTRADAY')
+    : segment === 'futures' ? 'DHAN · FUTURES'
+    : 'DHAN · OPTIONS';
+}
 
-let riskMode = 'amount'; // 'amount' | 'percent'
-const modeButtons = document.querySelectorAll('#risk-mode-toggle button');
-modeButtons.forEach(btn=>{
+/* ---- toggles ---- */
+let cashType = 'delivery';
+document.querySelectorAll('#cash-type-toggle button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
-    modeButtons.forEach(b=>b.classList.remove('on'));
+    document.querySelectorAll('#cash-type-toggle button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    cashType = btn.dataset.val;
+    applySegmentVisibility();
+    compute();
+  });
+});
+
+let direction = 'long';
+document.querySelectorAll('#direction-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#direction-toggle button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    direction = btn.dataset.val;
+    compute();
+  });
+});
+
+let optionRight = 'CE';
+document.querySelectorAll('#option-right-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#option-right-toggle button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    optionRight = btn.dataset.val;
+    compute();
+  });
+});
+
+let isWoman = false;
+document.querySelectorAll('#women-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#women-toggle button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    isWoman = btn.dataset.val === 'yes';
+    compute();
+  });
+});
+
+let riskMode = 'amount';
+document.querySelectorAll('#risk-mode-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#risk-mode-toggle button').forEach(b=>b.classList.remove('on'));
     btn.classList.add('on');
     riskMode = btn.dataset.mode;
     document.getElementById('risk-amount-field').style.display = riskMode==='amount' ? 'block':'none';
@@ -694,21 +632,114 @@ modeButtons.forEach(btn=>{
   });
 });
 
-[capitalEl, riskAmountEl, riskPercentEl, entryEl, slEl, lotsizeEl].forEach(el=>{
-  el.addEventListener('input', compute);
-});
+/* ============================================================
+   DHAN CHARGES ENGINE (2026 rate card)
+   ============================================================ */
+const RATES = {
+  brokerage: { perOrderCap: 20, pct: 0.0003 },           // 0.03% or ₹20/order, whichever lower (cash intraday & futures)
+  brokerageOptionsFlat: 20,                               // ₹20 flat per executed order (options)
+  stt: {
+    cashDelivery: 0.001,      // 0.1% both legs
+    cashIntraday: 0.00025,    // 0.025% sell leg only
+    futures: 0.0005,          // 0.05% sell leg only (Budget 2026 revised rate)
+    options: 0.0015           // 0.15% sell leg premium (Budget 2026 revised rate)
+  },
+  stampDuty: {
+    cashDelivery: 0.00015,    // 0.015% buy leg
+    cashIntraday: 0.00003,    // 0.003% buy leg
+    futures: 0.00002,         // 0.002% buy leg
+    options: 0.00003          // 0.003% buy leg
+  },
+  exchangeTxn: {
+    cash: 0.0000345,          // 0.00345% both legs (NSE)
+    futures: 0.000019,        // 0.0019% both legs
+    options: 0.000495         // 0.0495% both legs (on premium)
+  },
+  sebi: 0.000001,             // ₹10/crore = 0.0001% ... wait see note below
+  gstRate: 0.18,
+  dpCharge: 14.75             // ₹12.5 + 18% GST, per scrip per day, cash delivery sell only
+};
+// NOTE: SEBI turnover fee is ₹10 per crore = 0.0001%. Encoded correctly below as 0.000001 * 100 in calc -> fix inline.
+const SEBI_RATE = 0.0001/100; // 0.0001% expressed as a fraction of turnover
 
 function rupee(n){
   if(!isFinite(n)) return '—';
-  return '₹' + fmt.format(n);
+  const neg = n < 0;
+  const v = '₹' + fmt.format(Math.abs(n));
+  return neg ? '−' + v : v;
+}
+const fmt = new Intl.NumberFormat('en-IN', {maximumFractionDigits:2});
+const fmtInt = new Intl.NumberFormat('en-IN');
+
+function computeCharges(buyLegValue, sellLegValue, seg, opts){
+  const turnover = buyLegValue + sellLegValue;
+  let brokerage = 0, stt = 0, stampDuty = 0, exch = 0;
+
+  if(seg === 'cash'){
+    if(opts.cashType === 'delivery'){
+      brokerage = 0;
+      stt = (buyLegValue + sellLegValue) * RATES.stt.cashDelivery;
+      stampDuty = buyLegValue * RATES.stampDuty.cashDelivery;
+    } else {
+      const perOrder = v => Math.min(RATES.brokerage.perOrderCap, v * RATES.brokerage.pct);
+      brokerage = perOrder(buyLegValue) + perOrder(sellLegValue);
+      stt = sellLegValue * RATES.stt.cashIntraday;
+      stampDuty = buyLegValue * RATES.stampDuty.cashIntraday;
+    }
+    exch = turnover * RATES.exchangeTxn.cash;
+  } else if(seg === 'futures'){
+    const perOrder = v => Math.min(RATES.brokerage.perOrderCap, v * RATES.brokerage.pct);
+    brokerage = perOrder(buyLegValue) + perOrder(sellLegValue);
+    stt = sellLegValue * RATES.stt.futures;
+    stampDuty = buyLegValue * RATES.stampDuty.futures;
+    exch = turnover * RATES.exchangeTxn.futures;
+  } else if(seg === 'options'){
+    brokerage = RATES.brokerageOptionsFlat * 2; // both legs
+    stt = sellLegValue * RATES.stt.options;
+    stampDuty = buyLegValue * RATES.stampDuty.options;
+    exch = turnover * RATES.exchangeTxn.options;
+  }
+
+  if(opts.isWoman && (seg === 'cash' && opts.cashType === 'intraday' || seg === 'futures' || seg === 'options')){
+    brokerage = brokerage * 0.5;
+  }
+
+  const sebi = turnover * SEBI_RATE;
+  const gst = (brokerage + exch + sebi) * RATES.gstRate;
+  const dp = (seg === 'cash' && opts.cashType === 'delivery' && opts.isSellingDelivery) ? RATES.dpCharge : 0;
+
+  const total = brokerage + stt + stampDuty + exch + sebi + gst + dp;
+  return { brokerage, stt, stampDuty, exch, sebi, gst, dp, total, turnover };
+}
+
+/* ============================================================
+   MAIN COMPUTE
+   ============================================================ */
+const capitalEl = document.getElementById('capital');
+const riskAmountEl = document.getElementById('risk-amount');
+const riskPercentEl = document.getElementById('risk-percent');
+const entryEl = document.getElementById('entry');
+const slEl = document.getElementById('sl');
+const exitEl = document.getElementById('exit-price');
+const lotFutEl = document.getElementById('lotsize-fut');
+const lotOptEl = document.getElementById('lotsize-opt');
+
+[capitalEl, riskAmountEl, riskPercentEl, entryEl, slEl, exitEl, lotFutEl, lotOptEl].forEach(el=>{
+  el.addEventListener('input', compute);
+});
+
+function getLotSize(){
+  if(segment === 'futures') return parseInt(lotFutEl.value) || 0;
+  if(segment === 'options') return parseInt(lotOptEl.value) || 0;
+  return 0;
 }
 
 function compute(){
   const capital = parseFloat(capitalEl.value) || 0;
   const entry = parseFloat(entryEl.value);
   const sl = parseFloat(slEl.value);
-  const lotSize = parseInt(lotsizeEl.value);
-  const hasLot = !!lotSize && lotSize > 0;
+  const lotSize = getLotSize();
+  const hasLot = segment !== 'cash' && lotSize > 0;
 
   let riskAmount;
   if(riskMode === 'amount'){
@@ -732,7 +763,8 @@ function compute(){
   }
 
   const perUnitRisk = Math.abs(entry - sl);
-  const isLong = entry > sl;
+  // for cash, direction is implied by entry vs sl; for futures/options, user picks explicitly
+  const isLong = segment === 'cash' ? (entry > sl) : (direction === 'long');
 
   directionFlag.innerHTML = isLong
     ? '<b>LONG</b> — target above entry, stop below'
@@ -750,93 +782,107 @@ function compute(){
   const deployed = qty * entry;
 
   document.getElementById('out-qty').textContent = qty>0 ? fmtInt.format(qty) : '0';
-  document.getElementById('out-qty-sub').textContent = hasLot ? (lots + ' lot' + (lots===1?'':'s') + ' × ' + lotSize) : (qty>0 ? 'shares/units' : 'risk too small for 1 unit');
+  document.getElementById('out-qty-sub').textContent = hasLot ? (lots + ' lot' + (lots===1?'':'s') + ' × ' + lotSize) : (qty>0 ? (segment==='cash' ? 'shares' : 'units') : 'risk too small for 1 unit');
   document.getElementById('out-perunit').textContent = rupee(perUnitRisk);
   document.getElementById('out-actual-risk').textContent = rupee(actualRisk);
   document.getElementById('out-risk-pct').textContent = capital>0 ? (actualRisk/capital*100).toFixed(2) + '% of capital' : '';
   document.getElementById('out-deployed').textContent = rupee(deployed);
-  document.getElementById('out-deployed-pct').textContent = capital>0 ? (deployed/capital*100).toFixed(1) + '% of capital' : '';
 
-  buildLadderAndTable(entry, sl, perUnitRisk, isLong, qty);
+  applySegmentVisibility(); // keep broker tag in sync
+
+  computeRealPnL(entry, sl, qty, isLong, perUnitRisk);
+  buildLadder(entry, perUnitRisk, isLong, qty);
 }
 
 function resetOutputs(){
-  ['out-qty','out-perunit','out-actual-risk','out-deployed'].forEach(id=>document.getElementById(id).textContent='—');
-  ['out-qty-sub','out-risk-pct','out-deployed-pct'].forEach(id=>document.getElementById(id).textContent='\u00A0');
-  document.getElementById('ladder-labels').innerHTML = '';
-  document.getElementById('fill-risk').style.width = '0';
-  document.getElementById('fill-reward').style.width = '0';
+  ['out-qty','out-perunit','out-actual-risk','out-deployed','out-gross-pnl','out-total-charges','out-net-r'].forEach(id=>document.getElementById(id).textContent='—');
+  document.getElementById('out-qty-sub').textContent = '\u00A0';
+  document.getElementById('out-net-pnl').textContent = '₹—';
+  document.getElementById('out-net-pnl').className = 'amount';
+  document.getElementById('out-net-pnl-sub').textContent = 'enter entry, SL & exit to compute';
+  document.getElementById('charges-tbody').innerHTML = '';
   document.getElementById('tp-table-body').innerHTML = '';
 }
 
-function buildLadderAndTable(entry, sl, perUnitRisk, isLong, qty){
-  const levels = [1,2,3,4,5];
-  const targets = levels.map(r => isLong ? entry + r*perUnitRisk : entry - r*perUnitRisk);
+function chargesRowsHTML(c){
+  const rows = [
+    ['Brokerage', c.brokerage],
+    ['STT', c.stt],
+    ['Stamp Duty', c.stampDuty],
+    ['Exchange Txn Charges', c.exch],
+    ['SEBI Charges', c.sebi],
+    ['GST (18%)', c.gst],
+  ];
+  if(c.dp > 0) rows.push(['DP Charges', c.dp]);
+  return rows.map(([label,val])=>`<tr><td class="label">${label}</td><td class="val">${rupee(val)}</td></tr>`).join('')
+    + `<tr class="total"><td>Total Charges</td><td class="val">${rupee(c.total)}</td></tr>`;
+}
 
-  // table
+function computeRealPnL(entry, sl, qty, isLong, perUnitRisk){
+  let exit = parseFloat(exitEl.value);
+  if(!exit || exit<=0){
+    exit = isLong ? entry + perUnitRisk : entry - perUnitRisk; // default to 1R target
+  }
+  if(qty <= 0){
+    document.getElementById('charges-tbody').innerHTML = '';
+    document.getElementById('out-gross-pnl').textContent = '—';
+    document.getElementById('out-total-charges').textContent = '—';
+    document.getElementById('out-net-r').textContent = '—';
+    document.getElementById('out-net-pnl').textContent = '₹—';
+    document.getElementById('out-net-pnl-sub').textContent = 'quantity too small — widen risk or narrow stop';
+    return;
+  }
+
+  const buyLegValue = isLong ? qty*entry : qty*exit;
+  const sellLegValue = isLong ? qty*exit : qty*entry;
+  const grossPnl = sellLegValue - buyLegValue;
+
+  const c = computeCharges(buyLegValue, sellLegValue, segment, {
+    cashType, isWoman, isSellingDelivery: true
+  });
+
+  const netPnl = grossPnl - c.total;
+  const netR = perUnitRisk>0 ? (netPnl / (qty*perUnitRisk)) : 0;
+
+  document.getElementById('charges-tbody').innerHTML = chargesRowsHTML(c);
+  document.getElementById('out-gross-pnl').textContent = rupee(grossPnl);
+  document.getElementById('out-gross-pnl').className = 'v ' + (grossPnl>=0?'profit':'risk');
+  document.getElementById('out-total-charges').textContent = rupee(c.total);
+  document.getElementById('out-net-r').textContent = (netR>=0?'+':'') + netR.toFixed(2) + 'R';
+  document.getElementById('out-net-r').className = 'v ' + (netR>=0?'profit':'risk');
+
+  const netEl = document.getElementById('out-net-pnl');
+  netEl.textContent = (netPnl>=0?'+':'') + rupee(netPnl);
+  netEl.className = 'amount ' + (netPnl>=0?'profit':'risk');
+  document.getElementById('out-net-pnl-sub').textContent =
+    `at exit ${rupee(exit)} · charges ${capital0pct(c.total, Math.abs(grossPnl)||1)}% of gross move`;
+}
+function capital0pct(part, whole){ return (part/whole*100).toFixed(1); }
+
+function buildLadder(entry, perUnitRisk, isLong, qty){
+  const levels = [1,2,3,4,5];
   const tbody = document.getElementById('tp-table-body');
-  tbody.innerHTML = levels.map((r,i)=>{
-    const price = targets[i];
-    const gainPerShare = r * perUnitRisk;
-    const profit = gainPerShare * qty;
+  if(qty<=0){ tbody.innerHTML=''; return; }
+
+  tbody.innerHTML = levels.map(r=>{
+    const price = isLong ? entry + r*perUnitRisk : entry - r*perUnitRisk;
+    const buyLegValue = isLong ? qty*entry : qty*price;
+    const sellLegValue = isLong ? qty*price : qty*entry;
+    const gross = sellLegValue - buyLegValue;
+    const c = computeCharges(buyLegValue, sellLegValue, segment, { cashType, isWoman, isSellingDelivery:true });
+    const net = gross - c.total;
     return `<tr>
       <td>TP${r}</td>
       <td class="r-badge">${r}R</td>
       <td class="tp-price">${rupee(price)}</td>
-      <td class="dim">${rupee(gainPerShare)}</td>
-      <td>${rupee(profit)}</td>
+      <td class="dim">${rupee(gross)}</td>
+      <td class="dim">${rupee(c.total)}</td>
+      <td class="${net>=0?'net-pos':'net-neg'}">${net>=0?'+':''}${rupee(net)}</td>
     </tr>`;
   }).join('');
-
-  // ladder — map SL ... entry ... TP5 to 0-100%
-  const low = isLong ? sl : targets[4];
-  const high = isLong ? targets[4] : sl;
-  const span = high - low;
-
-  function pct(v){ return span>0 ? ((v-low)/span*100) : 50; }
-
-  const slPct = pct(sl);
-  const entryPct = pct(entry);
-
-  const fillRisk = document.getElementById('fill-risk');
-  const fillReward = document.getElementById('fill-reward');
-  const riskLeft = Math.min(slPct, entryPct);
-  const riskWidth = Math.abs(entryPct - slPct);
-  fillRisk.style.left = riskLeft + '%';
-  fillRisk.style.width = riskWidth + '%';
-
-  const rewardLeft = isLong ? entryPct : pct(targets[4]);
-  const rewardWidth = Math.abs(pct(targets[4]) - entryPct);
-  fillReward.style.left = rewardLeft + '%';
-  fillReward.style.width = rewardWidth + '%';
-
-  const labelsEl = document.getElementById('ladder-labels');
-  let marks = [
-    {p: slPct, price: sl, tag:'SL', cls:'sl'},
-    {p: entryPct, price: entry, tag:'ENTRY', cls:'entry'},
-  ];
-  levels.forEach((r,i)=> marks.push({p: pct(targets[i]), price: targets[i], tag:'TP'+r, cls:'tp', r}));
-
-  labelsEl.innerHTML = marks.map(m => `
-    <div class="ladder-label ${m.cls}" style="left:${m.p}%;">
-      <span class="lp">${m.tag}</span>
-      ${rupee(m.price)}<br>
-      ${m.r ? '<span class="lr">'+m.r+'R</span>' : (m.cls==='entry' ? '<span class="lr">0R</span>' : '<span class="lr">stop</span>')}
-    </div>
-  `).join('');
-
-  // reposition tick marks visually via same left offsets on the track
-  const track = document.getElementById('ladder-track');
-  // remove old ticks
-  track.querySelectorAll('.ladder-tick').forEach(t=>t.remove());
-  marks.forEach(m=>{
-    const tick = document.createElement('div');
-    tick.className = 'ladder-tick ' + m.cls;
-    tick.style.left = m.p + '%';
-    track.appendChild(tick);
-  });
 }
 
+applySegmentVisibility();
 compute();
 </script>
 </body>
