@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RISK DESK — Defined-Risk Position Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0b0d10;
+    --panel:#12151a;
+    --panel-raised:#161a20;
+    --line:#242a32;
+    --line-soft:#1a1f26;
+    --paper:#eae7dd;
+    --muted:#868c96;
+    --muted-dim:#565c66;
+    --amber:#e8a33d;
+    --amber-dim:#8a6626;
+    --profit:#3ecf8e;
+    --profit-dim:#1e4a37;
+    --risk:#e5484d;
+    --risk-dim:#4a2225;
+    --display:'Space Grotesk', sans-serif;
+    --mono:'JetBrains Mono', monospace;
+    --body:'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{-webkit-tap-highlight-color:transparent;}
+  body{
+    background:var(--ink);
+    color:var(--paper);
+    font-family:var(--body);
+    min-height:100vh;
+    overflow-x:hidden;
+    background-image:
+      linear-gradient(rgba(232,163,61,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,163,61,0.025) 1px, transparent 1px);
+    background-size:36px 36px;
+  }
+  ::selection{background:var(--amber);color:var(--ink);}
+
+  /* ---------- SCREEN MANAGEMENT ---------- */
+  .screen{display:none;min-height:100vh;}
+  .screen.active{display:block;}
+
+  /* ================= LANDING ================= */
+  #screen-landing{
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+    position:relative;
+  }
+  .ticker{
+    border-bottom:1px solid var(--line);
+    overflow:hidden;
+    white-space:nowrap;
+    padding:10px 0;
+    background:var(--panel);
+  }
+  .ticker.bottom-line{border-bottom:none;border-top:1px solid var(--line);}
+  .ticker-track{
+    display:inline-block;
+    white-space:nowrap;
+    animation:ticker-scroll 55s linear infinite;
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.03em;
+    color:var(--muted-dim);
+  }
+  .ticker.reverse .ticker-track{animation-direction:reverse;animation-duration:70s;}
+  .ticker-track span{margin-right:44px;}
+  .ticker-track span::before{content:"◆ ";color:var(--amber-dim);}
+  @keyframes ticker-scroll{
+    from{transform:translateX(0);}
+    to{transform:translateX(-50%);}
+  }
+
+  .landing-main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:48px 24px;
+    position:relative;
+  }
+  .brand-mark{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.35em;
+    color:var(--amber);
+    text-transform:uppercase;
+    margin-bottom:28px;
+    opacity:0;
+    animation:rise 0.7s ease forwards 0.1s;
+  }
+  .brand-mark::before{content:"01 — 02 — 03 — 04 — 05";display:block;font-size:10px;color:var(--muted-dim);letter-spacing:0.25em;margin-bottom:10px;}
+  h1.title{
+    font-family:var(--display);
+    font-weight:700;
+    font-size:clamp(40px, 8vw, 92px);
+    line-height:0.98;
+    letter-spacing:-0.02em;
+    color:var(--paper);
+    opacity:0;
+    animation:rise 0.8s ease forwards 0.25s;
+  }
+  h1.title em{
+    font-style:normal;
+    color:var(--amber);
+  }
+  .subtitle{
+    font-family:var(--body);
+    font-size:15px;
+    color:var(--muted);
+    max-width:520px;
+    margin:22px auto 0;
+    line-height:1.6;
+    opacity:0;
+    animation:rise 0.8s ease forwards 0.4s;
+  }
+
+  .quote-box{
+    margin-top:56px;
+    max-width:640px;
+    min-height:120px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    opacity:0;
+    animation:rise 0.8s ease forwards 0.55s;
+  }
+  .quote-rule{
+    width:34px;height:2px;background:var(--amber);margin-bottom:20px;
+  }
+  #quote-text{
+    font-family:var(--display);
+    font-size:clamp(18px, 2.6vw, 25px);
+    font-weight:500;
+    color:var(--paper);
+    line-height:1.5;
+    transition:opacity 0.5s ease, transform 0.5s ease;
+  }
+  #quote-index{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--muted-dim);
+    margin-top:18px;
+    letter-spacing:0.1em;
+  }
+  .fade-out{opacity:0 !important;transform:translateY(6px);}
+
+  .enter-btn{
+    margin-top:52px;
+    background:transparent;
+    border:1px solid var(--amber);
+    color:var(--amber);
+    font-family:var(--mono);
+    font-size:13px;
+    letter-spacing:0.15em;
+    text-transform:uppercase;
+    padding:16px 38px;
+    cursor:pointer;
+    position:relative;
+    transition:all 0.25s ease;
+    opacity:0;
+    animation:rise 0.8s ease forwards 0.7s;
+  }
+  .enter-btn:hover{background:var(--amber);color:var(--ink);}
+  .enter-btn:focus-visible{outline:2px solid var(--amber);outline-offset:4px;}
+
+  @keyframes rise{
+    from{opacity:0;transform:translateY(14px);}
+    to{opacity:1;transform:translateY(0);}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .ticker-track{animation:none;}
+    .brand-mark,h1.title,.subtitle,.quote-box,.enter-btn{animation:none;opacity:1;}
+  }
+
+  /* ================= CALCULATOR ================= */
+  #screen-calc{padding-bottom:60px;}
+  .calc-header{
+    border-bottom:1px solid var(--line);
+    padding:22px 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--panel);
+    position:sticky;top:0;z-index:20;
+  }
+  .calc-header .brand{
+    font-family:var(--mono);
+    font-size:13px;
+    letter-spacing:0.2em;
+    color:var(--amber);
+  }
+  .back-btn{
+    background:none;border:1px solid var(--line);color:var(--muted);
+    font-family:var(--mono);font-size:11px;letter-spacing:0.08em;
+    padding:9px 16px;cursor:pointer;transition:all 0.2s ease;text-transform:uppercase;
+  }
+  .back-btn:hover{border-color:var(--amber);color:var(--amber);}
+
+  .calc-wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:40px 24px 0;
+    display:grid;
+    grid-template-columns:360px 1fr;
+    gap:28px;
+    align-items:start;
+  }
+  @media (max-width:880px){
+    .calc-wrap{grid-template-columns:1fr;}
+  }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+  }
+  .panel-head{
+    padding:16px 20px;
+    border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .panel-head .eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:0.14em;
+    color:var(--muted-dim);text-transform:uppercase;
+  }
+  .panel-body{padding:22px 20px;}
+
+  .field{margin-bottom:20px;}
+  .field:last-child{margin-bottom:0;}
+  .field label{
+    display:block;font-family:var(--mono);font-size:11px;
+    letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;margin-bottom:9px;
+  }
+  .field-hint{font-family:var(--body);font-size:11.5px;color:var(--muted-dim);margin-top:7px;line-height:1.4;}
+  .input-row{display:flex;align-items:stretch;border:1px solid var(--line);background:var(--ink);}
+  .input-row .prefix{
+    display:flex;align-items:center;padding:0 12px;
+    font-family:var(--mono);font-size:13px;color:var(--muted-dim);
+    border-right:1px solid var(--line);background:var(--line-soft);
+  }
+  .input-row input{
+    flex:1;background:transparent;border:none;color:var(--paper);
+    font-family:var(--mono);font-size:16px;padding:13px 12px;width:100%;min-width:0;
+  }
+  .input-row input:focus{outline:none;background:rgba(232,163,61,0.05);}
+  .input-row:focus-within{border-color:var(--amber);}
+
+  .toggle-group{display:flex;border:1px solid var(--line);}
+  .toggle-group button{
+    flex:1;background:var(--ink);border:none;color:var(--muted);
+    font-family:var(--mono);font-size:11.5px;letter-spacing:0.06em;
+    padding:11px 8px;cursor:pointer;text-transform:uppercase;
+    border-right:1px solid var(--line);transition:all 0.2s ease;
+  }
+  .toggle-group button:last-child{border-right:none;}
+  .toggle-group button.on{background:var(--amber);color:var(--ink);font-weight:600;}
+  .toggle-group button:not(.on):hover{color:var(--paper);}
+
+  .direction-flag{
+    margin-top:18px;padding:12px 14px;font-family:var(--mono);font-size:12px;
+    letter-spacing:0.05em;border-left:2px solid var(--amber);background:var(--line-soft);color:var(--muted);
+  }
+  .direction-flag b{color:var(--paper);}
+  .direction-flag.long{border-color:var(--profit);}
+  .direction-flag.short{border-color:var(--risk);}
+
+  /* results side */
+  .stat-strip{
+    display:grid;grid-template-columns:repeat(4,1fr);
+    border:1px solid var(--line);margin-bottom:22px;
+  }
+  .stat{
+    padding:18px 16px;border-right:1px solid var(--line);
+  }
+  .stat:last-child{border-right:none;}
+  .stat .k{font-family:var(--mono);font-size:10.5px;letter-spacing:0.1em;color:var(--muted-dim);text-transform:uppercase;margin-bottom:9px;}
+  .stat .v{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--paper);}
+  .stat .v.amber{color:var(--amber);}
+  .stat .v.profit{color:var(--profit);}
+  .stat .v.risk{color:var(--risk);}
+  .stat .sub{font-family:var(--body);font-size:11px;color:var(--muted-dim);margin-top:5px;}
+  @media (max-width:640px){.stat-strip{grid-template-columns:repeat(2,1fr);}
+    .stat:nth-child(2){border-right:none;}
+    .stat:nth-child(3),.stat:nth-child(4){border-top:1px solid var(--line);}}
+
+  /* R-ladder — signature element */
+  .ladder-wrap{padding:26px 20px 20px;}
+  .ladder-title{font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:var(--muted-dim);text-transform:uppercase;margin-bottom:22px;}
+  .ladder{position:relative;height:6px;background:var(--line);margin:0 6px 10px;border-radius:2px;}
+  .ladder-fill-risk{position:absolute;top:0;bottom:0;background:var(--risk-dim);border-radius:2px;}
+  .ladder-fill-reward{position:absolute;top:0;bottom:0;background:var(--profit-dim);border-radius:2px;}
+  .ladder-tick{
+    position:absolute;top:-5px;width:2px;height:16px;background:var(--muted-dim);
+  }
+  .ladder-tick.entry{background:var(--paper);width:2px;}
+  .ladder-tick.sl{background:var(--risk);}
+  .ladder-tick.tp{background:var(--profit);}
+  .ladder-labels{position:relative;height:56px;margin:0 6px;}
+  .ladder-label{
+    position:absolute;transform:translateX(-50%);text-align:center;
+    font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;
+  }
+  .ladder-label .lp{font-weight:700;font-size:12px;display:block;margin-bottom:3px;}
+  .ladder-label.sl .lp{color:var(--risk);}
+  .ladder-label.entry .lp{color:var(--paper);}
+  .ladder-label.tp .lp{color:var(--profit);}
+  .ladder-label .lr{font-size:9.5px;color:var(--muted-dim);}
+
+  table.tp-table{width:100%;border-collapse:collapse;margin-top:6px;}
+  table.tp-table th{
+    text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;
+    color:var(--muted-dim);text-transform:uppercase;padding:12px 14px;border-bottom:1px solid var(--line);
+  }
+  table.tp-table td{
+    font-family:var(--mono);font-size:14px;padding:13px 14px;border-bottom:1px solid var(--line-soft);color:var(--paper);
+  }
+  table.tp-table tr:last-child td{border-bottom:none;}
+  table.tp-table td.r-badge{color:var(--profit);font-weight:600;}
+  table.tp-table td.tp-price{font-weight:700;font-size:15px;}
+  table.tp-table td.dim{color:var(--muted);}
+  table.tp-table tr:hover td{background:rgba(232,163,61,0.03);}
+
+  .footnote{
+    font-family:var(--body);font-size:11.5px;color:var(--muted-dim);
+    padding:16px 20px 0;line-height:1.6;
+  }
+
+  .quote-strip-calc{
+    max-width:1180px;margin:36px auto 0;padding:0 24px;
+    font-family:var(--display);font-size:14px;color:var(--muted-dim);
+    text-align:center;font-style:normal;
+  }
+  .quote-strip-calc span{color:var(--amber);}
+</style>
+</head>
+<body>
+
+<!-- ============ LANDING SCREEN ============ -->
+<section id="screen-landing" class="screen active">
+  <div class="ticker">
+    <div class="ticker-track" id="ticker-top"></div>
+  </div>
+
+  <div class="landing-main">
+    <div class="brand-mark">Position Sizing &nbsp;·&nbsp; Defined Risk &nbsp;·&nbsp; Personal Desk</div>
+    <h1 class="title">RISK<em>DESK</em></h1>
+    <p class="subtitle">You don't control where price goes. You control how much you lose finding out. Size the trade before you take it.</p>
+
+    <div class="quote-box">
+      <div class="quote-rule"></div>
+      <div id="quote-text">Loading...</div>
+      <div id="quote-index">Q. 001 / 100</div>
+    </div>
+
+    <button class="enter-btn" id="enter-btn">Enter the Desk →</button>
+  </div>
+
+  <div class="ticker bottom-line reverse">
+    <div class="ticker-track" id="ticker-bottom"></div>
+  </div>
+</section>
+
+<!-- ============ CALCULATOR SCREEN ============ -->
+<section id="screen-calc" class="screen">
+  <div class="calc-header">
+    <div class="brand">RISK<span style="color:var(--paper)">DESK</span></div>
+    <button class="back-btn" id="back-btn">← Welcome</button>
+  </div>
+
+  <div class="calc-wrap">
+    <!-- INPUT PANEL -->
+    <div class="panel">
+      <div class="panel-head"><span class="eyebrow">Trade Inputs</span></div>
+      <div class="panel-body">
+
+        <div class="field">
+          <label for="capital">Total Capital</label>
+          <div class="input-row">
+            <span class="prefix">₹</span>
+            <input type="number" id="capital" value="50000" inputmode="decimal" step="any">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Risk Input Mode</label>
+          <div class="toggle-group" id="risk-mode-toggle">
+            <button class="on" data-mode="amount">₹ Amount</button>
+            <button data-mode="percent">% of Capital</button>
+          </div>
+        </div>
+
+        <div class="field" id="risk-amount-field">
+          <label for="risk-amount">Risk Amount</label>
+          <div class="input-row">
+            <span class="prefix">₹</span>
+            <input type="number" id="risk-amount" value="500" inputmode="decimal" step="any">
+          </div>
+          <div class="field-hint" id="risk-pct-hint"></div>
+        </div>
+
+        <div class="field" id="risk-percent-field" style="display:none;">
+          <label for="risk-percent">Risk %</label>
+          <div class="input-row">
+            <input type="number" id="risk-percent" value="1" inputmode="decimal" step="any">
+            <span class="prefix" style="border-right:none;border-left:1px solid var(--line);">%</span>
+          </div>
+          <div class="field-hint" id="risk-amt-hint"></div>
+        </div>
+
+        <div class="field">
+          <label for="entry">Entry Price</label>
+          <div class="input-row">
+            <span class="prefix">₹</span>
+            <input type="number" id="entry" value="173.89" inputmode="decimal" step="any">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="sl">Stop Loss Price</label>
+          <div class="input-row">
+            <span class="prefix">₹</span>
+            <input type="number" id="sl" value="171.50" inputmode="decimal" step="any">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="lotsize">Lot Size <span style="color:var(--muted-dim);text-transform:none;">(optional, for F&O)</span></label>
+          <div class="input-row">
+            <input type="number" id="lotsize" placeholder="e.g. 1500 — leave blank for equity" inputmode="numeric" step="1">
+          </div>
+        </div>
+
+        <div class="direction-flag" id="direction-flag">— enter entry &amp; SL —</div>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div>
+      <div class="stat-strip">
+        <div class="stat">
+          <div class="k">Quantity</div>
+          <div class="v amber" id="out-qty">—</div>
+          <div class="sub" id="out-qty-sub">&nbsp;</div>
+        </div>
+        <div class="stat">
+          <div class="k">Risk / Share</div>
+          <div class="v" id="out-perunit">—</div>
+        </div>
+        <div class="stat">
+          <div class="k">Actual Risk</div>
+          <div class="v risk" id="out-actual-risk">—</div>
+          <div class="sub" id="out-risk-pct">&nbsp;</div>
+        </div>
+        <div class="stat">
+          <div class="k">Capital Deployed</div>
+          <div class="v" id="out-deployed">—</div>
+          <div class="sub" id="out-deployed-pct">&nbsp;</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">Risk / Reward Ladder</span></div>
+        <div class="ladder-wrap">
+          <div class="ladder-title">Stop → Entry → Targets, scaled by distance</div>
+          <div class="ladder" id="ladder-track">
+            <div class="ladder-fill-risk" id="fill-risk"></div>
+            <div class="ladder-fill-reward" id="fill-reward"></div>
+          </div>
+          <div class="ladder-labels" id="ladder-labels"></div>
+        </div>
+
+        <table class="tp-table">
+          <thead>
+            <tr>
+              <th>Level</th>
+              <th>R-Multiple</th>
+              <th>Target Price</th>
+              <th>Gain / Share</th>
+              <th>Profit at Qty</th>
+            </tr>
+          </thead>
+          <tbody id="tp-table-body"></tbody>
+        </table>
+
+        <p class="footnote">Targets are set at 1R–5R (multiples of your per-share risk) from entry, in the direction of your trade. Quantity is floored to a whole share/unit — and to whole lots if a lot size is set — so actual risk may land slightly under your risk input, never over.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="quote-strip-calc" id="calc-quote">&nbsp;</div>
+</section>
+
+<script>
+/* ============ 100 TRADING / MINDSET QUOTES ============ */
+const QUOTES = [
+"You don't need to be right. You need to be disciplined.",
+"Risk comes first. The trade idea is a distant second.",
+"Every position sizing decision is a risk decision in disguise.",
+"The market doesn't know you're in it. Trade like it doesn't care.",
+"Cut losses like a surgeon. Let winners run like a spectator.",
+"Your stop loss is a promise you make before emotion shows up.",
+"Discipline is remembering what you decided when you were calm.",
+"Amateurs think about how much they can make. Professionals think about how much they can lose.",
+"A defined risk trade is a decision you can defend at 3 a.m.",
+"Position size is the only variable you fully control.",
+"The market rewards patience and punishes urgency.",
+"Plan the risk. Let the reward take care of itself.",
+"Small losses are the cost of admission. Big losses are the cost of ego.",
+"You can be wrong on direction and still be right on process.",
+"Revenge trading is grief wearing a trading terminal.",
+"The trade you skip is sometimes the best trade you make.",
+"Capital preservation is offense disguised as defense.",
+"Every trader has a strategy until the stop loss gets hit.",
+"Conviction without a stop loss is just hope with extra steps.",
+"The size of your risk should never depend on the size of your confidence.",
+"Overtrading is boredom pretending to be opportunity.",
+"A good exit plan turns fear into a checklist.",
+"Consistency is built in the trades that felt boring.",
+"You don't rise to the level of your target. You fall to the level of your risk management.",
+"The account that survives is the account that compounds.",
+"Trading well is 10% analysis and 90% behaviour around that analysis.",
+"Your P&L is a lagging indicator of your discipline.",
+"The market will test your plan before it rewards it.",
+"Sizing down is not weakness. It is how you stay in the game long enough to be right.",
+"Every trade has three outcomes: win, lose, or learn. Only losing without learning is a true loss.",
+"The stop loss is not admitting defeat. It is refusing to gamble.",
+"Emotional trades are loud. Planned trades are quiet.",
+"You can't control the market. You can control your exposure to it.",
+"Risk what you can lose without changing how you sleep.",
+"Good traders think in probabilities, not certainties.",
+"The first loss is usually the cheapest loss.",
+"A plan without a defined risk is just an opinion with money attached.",
+"Patience is a position too.",
+"Your worst trading days are usually the days you didn't want to follow the plan.",
+"Process over outcome, every single time, especially when it's inconvenient.",
+"The market has no memory of your last trade. Neither should you.",
+"Chasing price is how disciplined plans quietly die.",
+"Every professional was once an amateur who refused to blow up their account.",
+"You trade the market in front of you, not the one in your head.",
+"Sizing a trade correctly makes being wrong survivable.",
+"Confidence is earned in the risk you took, not the profit you made.",
+"The best traders are professional loss-takers first, profit-takers second.",
+"Fear of missing out has closed more accounts than fear of losing.",
+"A trading plan you can't follow under pressure isn't a plan.",
+"The edge is in the exit, not just the entry.",
+"Protect the capital and the opportunities will keep coming.",
+"Your risk per trade should survive twenty losses in a row.",
+"Never let a winning streak write cheques your risk management can't cash.",
+"The goal isn't to be right every time. The goal is to lose small and win big enough.",
+"A calm trader reads price. An anxious trader reads their P&L.",
+"Every large loss started as a small loss someone refused to take.",
+"Sizing is strategy. Everything else is timing.",
+"The market pays for patience, not for prediction.",
+"Trading is the only business where you can be right and still lose money if sized wrong.",
+"Set the stop before the excitement. Move the target after the plan.",
+"A trader who can't define risk hasn't finished planning the trade.",
+"The account grows in the trades you didn't take.",
+"You are not your last trade.",
+"There is no such thing as a sure thing, only a well-sized bet.",
+"Losses are tuition. Overpaying tuition is optional.",
+"Trade your plan, not your prediction.",
+"The market humbles ego and rewards humility.",
+"Position sizing is where trading psychology becomes arithmetic.",
+"When in doubt, size down. Clarity returns with less on the line.",
+"The stop loss protects the account. The mindset protects the stop loss.",
+"Every green quarter is built on a hundred small, boring, disciplined trades.",
+"Risk management is the only strategy that works in every market condition.",
+"Don't average down on a broken thesis. Averaging down is not conviction, it's denial.",
+"Your biggest edge is knowing exactly how much you're willing to lose before you click buy.",
+"The market doesn't owe you a recovery. Manage risk like it never will.",
+"A trader who fears losing money has already lost their edge.",
+"Trading small when uncertain is how you stay big when it matters.",
+"The stop loss is the exit you choose. The margin call is the exit chosen for you.",
+"Great traders are boring in exactly the right moments.",
+"Every setup looks perfect until it isn't. That's why the stop exists.",
+"Risk first, reward second, ego last.",
+"The market is a mirror. It reflects exactly how disciplined you actually are.",
+"Winning is temporary. Process is permanent.",
+"You don't need a bigger position. You need a better plan.",
+"A trade well-sized is a trade you can walk away from without checking every five minutes.",
+"The best risk management is the kind you never have to think about because it's already built into the trade.",
+"Trading is a game of survival first, profit second.",
+"Every stop loss hit is data, not a verdict on your worth.",
+"Discipline is choosing what you want most over what you want now.",
+"The market rewards those who show up the same way every single day.",
+"There's no prize for the biggest position. There's a prize for the longest career.",
+"Cut the loss. Protect the next hundred trades.",
+"A single undisciplined trade can undo fifty disciplined ones.",
+"Know your exit before you know your entry.",
+"The size of the trade should never be bigger than your ability to stay calm.",
+"Consistency beats intensity in every market cycle.",
+"The market can stay irrational, but your risk sizing should never be.",
+"Trade the plan when it's boring so you can trust it when it's hard.",
+"A defined-risk trade turns fear into a number you already accepted.",
+"You manage risk before the trade. You manage emotion during it.",
+"The account curve reflects the mind that built it.",
+"Every professional trader's superpower is the trade they didn't take.",
+"Sizing correctly is how conviction and humility coexist."
+];
+
+function shuffledIndices(n){
+  const arr = Array.from({length:n}, (_,i)=>i);
+  for(let i=arr.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+/* ---------- ticker tapes ---------- */
+function buildTicker(elId, count){
+  const el = document.getElementById(elId);
+  const idxs = shuffledIndices(QUOTES.length).slice(0,count);
+  const html = idxs.map(i => `<span>${QUOTES[i]}</span>`).join('');
+  el.innerHTML = html + html; // duplicate for seamless loop
+}
+buildTicker('ticker-top', 18);
+buildTicker('ticker-bottom', 18);
+
+/* ---------- rotating hero quote ---------- */
+const order = shuffledIndices(QUOTES.length);
+let qPos = 0;
+const quoteTextEl = document.getElementById('quote-text');
+const quoteIndexEl = document.getElementById('quote-index');
+
+function showQuote(){
+  const idx = order[qPos];
+  quoteTextEl.textContent = "“" + QUOTES[idx] + "”";
+  quoteIndexEl.textContent = "Q. " + String(idx+1).padStart(3,'0') + " / " + QUOTES.length;
+}
+function nextQuote(){
+  quoteTextEl.classList.add('fade-out');
+  setTimeout(()=>{
+    qPos = (qPos+1) % order.length;
+    showQuote();
+    quoteTextEl.classList.remove('fade-out');
+  }, 480);
+}
+showQuote();
+let quoteTimer = setInterval(nextQuote, 5200);
+
+/* footer quote on calc screen — static pick */
+document.getElementById('calc-quote').innerHTML =
+  '<span>“</span>' + QUOTES[Math.floor(Math.random()*QUOTES.length)] + '<span>”</span>';
+
+/* ---------- screen switching ---------- */
+const landing = document.getElementById('screen-landing');
+const calc = document.getElementById('screen-calc');
+document.getElementById('enter-btn').addEventListener('click', ()=>{
+  landing.classList.remove('active');
+  calc.classList.add('active');
+  clearInterval(quoteTimer);
+  window.scrollTo(0,0);
+});
+document.getElementById('back-btn').addEventListener('click', ()=>{
+  calc.classList.remove('active');
+  landing.classList.add('active');
+  showQuote();
+  quoteTimer = setInterval(nextQuote, 5200);
+  window.scrollTo(0,0);
+});
+
+/* ============ CALCULATOR LOGIC ============ */
+const fmt = new Intl.NumberFormat('en-IN', {maximumFractionDigits:2});
+const fmtInt = new Intl.NumberFormat('en-IN');
+
+const capitalEl = document.getElementById('capital');
+const riskAmountEl = document.getElementById('risk-amount');
+const riskPercentEl = document.getElementById('risk-percent');
+const entryEl = document.getElementById('entry');
+const slEl = document.getElementById('sl');
+const lotsizeEl = document.getElementById('lotsize');
+
+let riskMode = 'amount'; // 'amount' | 'percent'
+const modeButtons = document.querySelectorAll('#risk-mode-toggle button');
+modeButtons.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    modeButtons.forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    riskMode = btn.dataset.mode;
+    document.getElementById('risk-amount-field').style.display = riskMode==='amount' ? 'block':'none';
+    document.getElementById('risk-percent-field').style.display = riskMode==='percent' ? 'block':'none';
+    compute();
+  });
+});
+
+[capitalEl, riskAmountEl, riskPercentEl, entryEl, slEl, lotsizeEl].forEach(el=>{
+  el.addEventListener('input', compute);
+});
+
+function rupee(n){
+  if(!isFinite(n)) return '—';
+  return '₹' + fmt.format(n);
+}
+
+function compute(){
+  const capital = parseFloat(capitalEl.value) || 0;
+  const entry = parseFloat(entryEl.value);
+  const sl = parseFloat(slEl.value);
+  const lotSize = parseInt(lotsizeEl.value);
+  const hasLot = !!lotSize && lotSize > 0;
+
+  let riskAmount;
+  if(riskMode === 'amount'){
+    riskAmount = parseFloat(riskAmountEl.value) || 0;
+    document.getElementById('risk-pct-hint').textContent = capital>0
+      ? '≈ ' + (riskAmount/capital*100).toFixed(2) + '% of capital'
+      : '';
+  } else {
+    const pct = parseFloat(riskPercentEl.value) || 0;
+    riskAmount = capital * pct/100;
+    document.getElementById('risk-amt-hint').textContent = '= ' + rupee(riskAmount);
+  }
+
+  const directionFlag = document.getElementById('direction-flag');
+
+  if(!entry || !sl || entry === sl || riskAmount<=0){
+    directionFlag.textContent = '— enter entry & SL —';
+    directionFlag.className = 'direction-flag';
+    resetOutputs();
+    return;
+  }
+
+  const perUnitRisk = Math.abs(entry - sl);
+  const isLong = entry > sl;
+
+  directionFlag.innerHTML = isLong
+    ? '<b>LONG</b> — target above entry, stop below'
+    : '<b>SHORT</b> — target below entry, stop above';
+  directionFlag.className = 'direction-flag ' + (isLong ? 'long':'short');
+
+  let qty = Math.floor(riskAmount / perUnitRisk);
+  let lots = 0;
+  if(hasLot){
+    lots = Math.floor(qty / lotSize);
+    qty = lots * lotSize;
+  }
+
+  const actualRisk = qty * perUnitRisk;
+  const deployed = qty * entry;
+
+  document.getElementById('out-qty').textContent = qty>0 ? fmtInt.format(qty) : '0';
+  document.getElementById('out-qty-sub').textContent = hasLot ? (lots + ' lot' + (lots===1?'':'s') + ' × ' + lotSize) : (qty>0 ? 'shares/units' : 'risk too small for 1 unit');
+  document.getElementById('out-perunit').textContent = rupee(perUnitRisk);
+  document.getElementById('out-actual-risk').textContent = rupee(actualRisk);
+  document.getElementById('out-risk-pct').textContent = capital>0 ? (actualRisk/capital*100).toFixed(2) + '% of capital' : '';
+  document.getElementById('out-deployed').textContent = rupee(deployed);
+  document.getElementById('out-deployed-pct').textContent = capital>0 ? (deployed/capital*100).toFixed(1) + '% of capital' : '';
+
+  buildLadderAndTable(entry, sl, perUnitRisk, isLong, qty);
+}
+
+function resetOutputs(){
+  ['out-qty','out-perunit','out-actual-risk','out-deployed'].forEach(id=>document.getElementById(id).textContent='—');
+  ['out-qty-sub','out-risk-pct','out-deployed-pct'].forEach(id=>document.getElementById(id).textContent='\u00A0');
+  document.getElementById('ladder-labels').innerHTML = '';
+  document.getElementById('fill-risk').style.width = '0';
+  document.getElementById('fill-reward').style.width = '0';
+  document.getElementById('tp-table-body').innerHTML = '';
+}
+
+function buildLadderAndTable(entry, sl, perUnitRisk, isLong, qty){
+  const levels = [1,2,3,4,5];
+  const targets = levels.map(r => isLong ? entry + r*perUnitRisk : entry - r*perUnitRisk);
+
+  // table
+  const tbody = document.getElementById('tp-table-body');
+  tbody.innerHTML = levels.map((r,i)=>{
+    const price = targets[i];
+    const gainPerShare = r * perUnitRisk;
+    const profit = gainPerShare * qty;
+    return `<tr>
+      <td>TP${r}</td>
+      <td class="r-badge">${r}R</td>
+      <td class="tp-price">${rupee(price)}</td>
+      <td class="dim">${rupee(gainPerShare)}</td>
+      <td>${rupee(profit)}</td>
+    </tr>`;
+  }).join('');
+
+  // ladder — map SL ... entry ... TP5 to 0-100%
+  const low = isLong ? sl : targets[4];
+  const high = isLong ? targets[4] : sl;
+  const span = high - low;
+
+  function pct(v){ return span>0 ? ((v-low)/span*100) : 50; }
+
+  const slPct = pct(sl);
+  const entryPct = pct(entry);
+
+  const fillRisk = document.getElementById('fill-risk');
+  const fillReward = document.getElementById('fill-reward');
+  const riskLeft = Math.min(slPct, entryPct);
+  const riskWidth = Math.abs(entryPct - slPct);
+  fillRisk.style.left = riskLeft + '%';
+  fillRisk.style.width = riskWidth + '%';
+
+  const rewardLeft = isLong ? entryPct : pct(targets[4]);
+  const rewardWidth = Math.abs(pct(targets[4]) - entryPct);
+  fillReward.style.left = rewardLeft + '%';
+  fillReward.style.width = rewardWidth + '%';
+
+  const labelsEl = document.getElementById('ladder-labels');
+  let marks = [
+    {p: slPct, price: sl, tag:'SL', cls:'sl'},
+    {p: entryPct, price: entry, tag:'ENTRY', cls:'entry'},
+  ];
+  levels.forEach((r,i)=> marks.push({p: pct(targets[i]), price: targets[i], tag:'TP'+r, cls:'tp', r}));
+
+  labelsEl.innerHTML = marks.map(m => `
+    <div class="ladder-label ${m.cls}" style="left:${m.p}%;">
+      <span class="lp">${m.tag}</span>
+      ${rupee(m.price)}<br>
+      ${m.r ? '<span class="lr">'+m.r+'R</span>' : (m.cls==='entry' ? '<span class="lr">0R</span>' : '<span class="lr">stop</span>')}
+    </div>
+  `).join('');
+
+  // reposition tick marks visually via same left offsets on the track
+  const track = document.getElementById('ladder-track');
+  // remove old ticks
+  track.querySelectorAll('.ladder-tick').forEach(t=>t.remove());
+  marks.forEach(m=>{
+    const tick = document.createElement('div');
+    tick.className = 'ladder-tick ' + m.cls;
+    tick.style.left = m.p + '%';
+    track.appendChild(tick);
+  });
+}
+
+compute();
+</script>
+</body>
+</html>
