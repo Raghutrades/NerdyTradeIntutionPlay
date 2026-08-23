@@ -84,6 +84,17 @@
   .jump-live.show{display:block;}
   .hint{position:absolute;bottom:8px;left:12px;z-index:5;font-size:10px;color:var(--dim);pointer-events:none;opacity:.7;}
 
+  /* ---------------- on-chart quick trade dock ---------------- */
+  .chart-dock{position:absolute;top:46px;right:78px;z-index:20;display:flex;align-items:center;gap:5px;
+    background:rgba(18,22,31,.82);backdrop-filter:blur(4px);border:1px solid var(--border);border-radius:8px;padding:5px;box-shadow:0 4px 14px rgba(0,0,0,.35);}
+  .theme-light .chart-dock{background:rgba(255,255,255,.88);}
+  .chart-dock-qty{display:flex;align-items:center;gap:2px;margin-right:2px;}
+  .chart-dock-qty input{width:38px;text-align:center;padding:4px 2px;font-size:11px;}
+  .chart-dock-qty button{padding:4px 6px;font-size:11px;}
+  .cd-btn{padding:6px 10px;font-size:11px;}
+  .cd-close{background:var(--panel2);}
+  @media (max-width:768px){ .chart-dock{right:8px;top:auto;bottom:56px;flex-wrap:wrap;max-width:180px;} }
+
   /* ---------------- resizer & side panel ---------------- */
   .resizer {
     width: 6px; background: var(--panel2); cursor: col-resize; flex-shrink: 0; z-index: 10;
@@ -179,10 +190,10 @@
     </div>
     <div class="group">
       <select id="speedSel" title="Playback speed mapping real time to sim time">
-        <option value="1">1x (Realtime)</option>
+        <option value="1" selected>1x (Realtime)</option>
         <option value="10">10x</option>
         <option value="60">60x (1m/sec)</option>
-        <option value="300" selected>300x (5m/sec)</option>
+        <option value="300">300x (5m/sec)</option>
         <option value="1200">1200x (20m/sec)</option>
         <option value="3600">3600x (1H/sec)</option>
       </select>
@@ -263,8 +274,20 @@
       <!-- Live Real-Time Clock placed at the bottom right corner of the chart area -->
       <div id="realTimeClock">00:00:00 (UTC+5:30)</div>
       
-      <div class="hint">Drag left/right to pan smoothly · drag right edge to scale price · wheel/pinch to zoom</div>
+      <div class="hint">Drag left/right to pan smoothly · drag right edge to scale price · wheel/pinch to zoom · drag TP/SL lines to adjust</div>
       <button class="jump-live" id="btnJumpLive">● Jump to Live</button>
+
+      <div class="chart-dock" id="chartDock">
+        <div class="chart-dock-qty">
+          <button class="qtyStep" data-d="-1" data-target="chartQty">−</button>
+          <input type="number" id="chartQty" min="1" value="10">
+          <button class="qtyStep" data-d="1" data-target="chartQty">+</button>
+        </div>
+        <button class="buy cd-btn" id="chartBuy" title="Buy at market (B)">BUY</button>
+        <button class="sell cd-btn" id="chartSell" title="Sell at market (S)">SELL</button>
+        <button class="cd-btn cd-close" id="chartClose" title="Close position (C)">CLOSE</button>
+        <button class="cd-btn cd-close" id="chartReverse" title="Reverse position (V)">⇄</button>
+      </div>
     </div>
     
     <div class="resizer" id="panelResizer" title="Drag to resize panel"></div>
@@ -277,8 +300,7 @@
       
       <div class="side-tabs">
         <button class="side-tab active" data-tab="trade">Trade</button>
-        <button class="side-tab" data-tab="metrics">Metrics</button>
-        <button class="side-tab" data-tab="log">Log</button>
+        <button class="side-tab" data-tab="metrics">Metrics &amp; Log</button>
         <button class="side-tab" data-tab="settings">Settings</button>
       </div>
 
@@ -308,8 +330,63 @@
                   <input type="number" id="sideSl" style="width:100%; padding:6px; font-size:13px;" min="0" placeholder="SL">
                </div>
             </div>
-            <button id="sideClosePos" style="width:100%; margin-top:6px; padding:10px; font-weight:bold;">CLOSE POSITION (C)</button>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+              <button id="sideClosePos" style="padding:10px; font-weight:bold;">CLOSE (C)</button>
+              <button id="sideReverse" style="padding:10px; font-weight:bold;">⇄ REVERSE (V)</button>
+            </div>
+            <div class="persist-note">Tip: once a trade is live, grab the TP/SL lines on the chart and drag them — release to commit the new level.</div>
           </div>
+
+          <details class="card" id="rcDetails">
+            <summary style="cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);outline:none;">📐 Risk &amp; Qty Calculator</summary>
+            <div style="margin-top:10px;">
+              <div class="setting-row"><label>Capital ₹</label><input type="number" id="rcCapital" value="100000" style="width:110px;"></div>
+              <div class="setting-row"><label>Risk %</label><input type="number" id="rcRiskPct" value="1" step="0.1" style="width:110px;"></div>
+              <div class="setting-row"><label>Risk ₹</label><input type="number" id="rcRiskAmt" value="1000" style="width:110px;"></div>
+              <div class="pos-row" id="rcRuin" style="color:var(--dim);font-size:11px;">Survival: — losses</div>
+
+              <div class="setting-row"><label>Segment</label>
+                <select id="rcSegment" style="width:110px;">
+                  <option value="intraday" selected>Intraday</option>
+                  <option value="delivery">Delivery</option>
+                  <option value="futures">Futures</option>
+                  <option value="options">Options</option>
+                </select>
+              </div>
+              <div class="setting-row" id="rcLevRow"><label>Leverage</label><input type="number" id="rcLeverage" value="5" style="width:110px;"></div>
+              <div class="setting-row" id="rcLotRow" style="display:none;"><label>Lot Size</label><input type="number" id="rcLot" value="1" style="width:110px;"></div>
+              <div class="side-trade-btns" style="margin-top:2px;">
+                <button id="rcDirLong" class="buy active">LONG</button>
+                <button id="rcDirShort" class="sell">SHORT</button>
+              </div>
+
+              <div class="dock-lbl" style="margin-top:10px;">Price Levels</div>
+              <div class="setting-row"><label>Entry</label><input type="number" id="rcEntry" value="100.00" step="0.05" style="width:110px;"></div>
+              <div class="setting-row"><label>Stop Loss</label><input type="number" id="rcSl" value="98.00" step="0.05" style="width:110px;"></div>
+              <div class="setting-row"><label>Custom TP</label><input type="number" id="rcTp" value="106.00" step="0.05" style="width:110px;"></div>
+              <button id="rcPullChart" style="width:100%;">⤓ Use Current Chart Price as Entry</button>
+
+              <div class="metric-grid" style="margin-top:10px;">
+                <div class="metric"><div class="lbl" id="rcQtyLbl">Qty</div><div class="val" id="rcQty">0</div></div>
+                <div class="metric"><div class="lbl">Risk / Unit</div><div class="val" id="rcRiskUnit">₹0</div></div>
+                <div class="metric"><div class="lbl">Notional</div><div class="val" id="rcNotional">₹0</div></div>
+                <div class="metric"><div class="lbl">Margin Req.</div><div class="val" id="rcMargin">₹0</div></div>
+                <div class="metric"><div class="lbl">Total Charges</div><div class="val" id="rcCharges">₹0</div></div>
+                <div class="metric"><div class="lbl">True Breakeven</div><div class="val" id="rcBE">₹0</div></div>
+              </div>
+              <div class="persist-note" id="rcWarn" style="display:none;color:var(--down);"></div>
+              <div class="persist-note">Brok ₹<span id="rcChBrok">0</span> · STT ₹<span id="rcChStt">0</span> · Exch+SEBI ₹<span id="rcChExch">0</span> · Stamp ₹<span id="rcChStamp">0</span> · GST ₹<span id="rcChGst">0</span></div>
+              <button id="rcApply" style="width:100%;margin-top:8px;">↥ Apply Qty + TP/SL Above</button>
+
+              <div class="dock-lbl" style="margin-top:10px;">R-Multiple Targets</div>
+              <div style="max-height:220px;overflow-y:auto;">
+                <table class="log-table" id="rcTable">
+                  <thead><tr><th>Lvl</th><th>R</th><th>Price</th><th>Net PnL</th><th>ROI</th></tr></thead>
+                  <tbody id="rcTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </details>
 
           <div class="card">
             <h3>Position Status</h3>
@@ -334,7 +411,7 @@
           <div class="card">
             <h3>Hotkeys</h3>
             <div class="hotkeys">
-              <div><b>B</b> Buy &nbsp; <b>S</b> Sell &nbsp; <b>C</b> Close</div>
+              <div><b>B</b> Buy &nbsp; <b>S</b> Sell &nbsp; <b>C</b> Close &nbsp; <b>V</b> Reverse</div>
               <div><b>Space</b> Play/Pause &nbsp; <b>R</b> Replay</div>
               <div><b>N</b> Next chart </div>
               <div><b>[</b> / <b>]</b> Speed down/up</div>
@@ -343,7 +420,7 @@
           </div>
         </div>
 
-        <!-- METRICS TAB -->
+        <!-- METRICS TAB (advanced stats + full trade log) -->
         <div class="tab-panel" data-panel="metrics">
           <div class="card">
             <h3>Session Metrics</h3>
@@ -351,27 +428,31 @@
               <div class="metric"><div class="lbl">Trades</div><div class="val" id="mTrades">0</div></div>
               <div class="metric"><div class="lbl">Win Rate</div><div class="val" id="mWinRate">—</div></div>
               <div class="metric"><div class="lbl">Total PnL</div><div class="val" id="mTotalPnl">₹ 0</div></div>
+              <div class="metric"><div class="lbl">ROI on Capital</div><div class="val" id="mROI">—</div></div>
               <div class="metric"><div class="lbl">Profit Factor</div><div class="val" id="mPF">—</div></div>
+              <div class="metric"><div class="lbl">Expectancy</div><div class="val" id="mExp">—</div></div>
               <div class="metric"><div class="lbl">Avg Win</div><div class="val" id="mAvgWin">—</div></div>
               <div class="metric"><div class="lbl">Avg Loss</div><div class="val" id="mAvgLoss">—</div></div>
               <div class="metric"><div class="lbl">Best Trade</div><div class="val" id="mBest">—</div></div>
               <div class="metric"><div class="lbl">Worst Trade</div><div class="val" id="mWorst">—</div></div>
               <div class="metric"><div class="lbl">Max Drawdown</div><div class="val" id="mDD">—</div></div>
-              <div class="metric"><div class="lbl">Expectancy</div><div class="val" id="mExp">—</div></div>
+              <div class="metric"><div class="lbl">Max Drawdown %</div><div class="val" id="mDDPct">—</div></div>
               <div class="metric"><div class="lbl">Max Win Streak</div><div class="val" id="mWinStreak">—</div></div>
               <div class="metric"><div class="lbl">Max Loss Streak</div><div class="val" id="mLossStreak">—</div></div>
+              <div class="metric"><div class="lbl">Avg R-Multiple</div><div class="val" id="mAvgR">—</div></div>
+              <div class="metric"><div class="lbl">Long Win Rate</div><div class="val" id="mLongWR">—</div></div>
+              <div class="metric"><div class="lbl">Short Win Rate</div><div class="val" id="mShortWR">—</div></div>
+              <div class="metric"><div class="lbl">SL / TP / Manual Exits</div><div class="val" id="mExitMix" style="font-size:11.5px;">—</div></div>
             </div>
-            <canvas id="eqSpark" height="50" style="width:100%;height:50px;margin-top:10px;"></canvas>
+            <div class="dock-lbl" style="margin-top:12px;">Equity Curve (with drawdown)</div>
+            <canvas id="eqSpark" height="90" style="width:100%;height:90px;margin-top:4px;"></canvas>
             <button class="reset-btn" id="btnResetStats">Reset Stats</button>
             <div class="persist-note">Trades, stats, theme and panel width are saved locally. "Reset Stats" clears them.</div>
           </div>
-        </div>
 
-        <!-- LOG TAB -->
-        <div class="tab-panel" data-panel="log">
           <div class="card">
             <h3>Trade Log</h3>
-            <div style="max-height:520px;overflow-y:auto;">
+            <div style="max-height:420px;overflow-y:auto;">
               <table class="log-table" id="logTable">
                 <thead><tr><th>Sym</th><th>Dir</th><th>Entry</th><th>Exit</th><th>Qty</th><th>PnL</th><th>Via</th></tr></thead>
                 <tbody id="logBody"></tbody>
@@ -423,6 +504,11 @@ resizer.addEventListener('mousedown', (e) => {
   isResizing = true;
   resizer.classList.add('active');
   document.body.style.cursor = 'col-resize';
+});
+resizer.addEventListener('dblclick', () => {
+  root.style.setProperty('--panel-width', '320px');
+  lsSet(LS_PANEL_W, '320');
+  chart.resize();
 });
 document.addEventListener('mousemove', (e) => {
   if (!isResizing) return;
@@ -516,6 +602,10 @@ class CandleChart{
     this.colors = this._darkColors();
     this.live = null;
     this.onFollowChange = null;
+    this.onPriceLineDrag = null;   // (label, price) fired while dragging TP/SL/Entry
+    this.onPriceLineDrop = null;   // (label, price) fired on release
+    this.onChartTrade = null;      // (dir) fired on double-click market order
+    this.draggingLine = null;
     this.pad = { top:20, right:70, bottom:26, left:8 };
     this._ro = new ResizeObserver(()=>this.resize());
     this._ro.observe(canvas.parentElement);
@@ -523,8 +613,8 @@ class CandleChart{
     this.resize();
   }
   
-  _darkColors(){ return { bg:'#0d1117', grid:'#1c212b', axis:'#2b303b', text:'#c9d1d9', dim:'#7d8695', up:'#26a69a', down:'#ef5350', sessionBreak: 'rgba(255,255,255,0.25)' }; }
-  _lightColors(){ return { bg:'#f5f6f8', grid:'#e3e6ec', axis:'#cfd4dc', text:'#1b1f27', dim:'#5b6270', up:'#26a69a', down:'#ef5350', sessionBreak: 'rgba(0,0,0,0.25)' }; }
+  _darkColors(){ return { bg:'#0d1117', grid:'#1c212b', axis:'#2b303b', text:'#c9d1d9', dim:'#7d8695', up:'#26a69a', down:'#ef5350', sessionBreak: 'rgba(255,255,255,0.25)', panel2:'#1a2029' }; }
+  _lightColors(){ return { bg:'#f5f6f8', grid:'#e3e6ec', axis:'#cfd4dc', text:'#1b1f27', dim:'#5b6270', up:'#26a69a', down:'#ef5350', sessionBreak: 'rgba(0,0,0,0.25)', panel2:'#e9ecf1' }; }
   
   setTheme(isLight){ this.colors = isLight ? this._lightColors() : this._darkColors(); this.render(); }
   setGrid(v){ this.showGrid = v; this.render(); }
@@ -539,6 +629,26 @@ class CandleChart{
     if (this.onFollowChange) this.onFollowChange(true);
   }
   
+  priceAtY(localY){
+    const lo = this.lastLo, hi = this.lastHi;
+    if (lo==null || hi==null || !this.plotH) return null;
+    const t = (localY - this.pad.top) / this.plotH;
+    return lo + (1 - t) * (hi - lo);
+  }
+  yAtPrice(price){
+    const lo = this.lastLo, hi = this.lastHi;
+    if (lo==null || hi==null || !this.plotH) return null;
+    return this.pad.top + (1 - (price-lo)/(hi-lo)) * this.plotH;
+  }
+  _hitPriceLine(localX, localY){
+    if (localX < this.pad.left || localX > this.cssW - this.pad.right) return null;
+    for (const l of this.priceLines){
+      if (!l.draggable) continue;
+      const y = this.yAtPrice(l.price);
+      if (y!=null && Math.abs(localY - y) <= 7) return l;
+    }
+    return null;
+  }
   setData(candles, overlays, priceLines, priceZones, subSeries, maxEndFloat){
     this.candles = candles; 
     this.overlays = overlays || { vwap:[], avwap:[], ema9:[], ema21:[] };
@@ -586,6 +696,8 @@ class CandleChart{
     canvas.addEventListener('mousemove', e => {
       const r = canvas.getBoundingClientRect();
       this.hoverX = e.clientX - r.left; this.hoverY = e.clientY - r.top;
+      if (mode === null && this._hitPriceLine(this.hoverX, this.hoverY)) canvas.style.cursor = 'ns-resize';
+      else if (mode === null) canvas.style.cursor = 'crosshair';
       if (this.crosshairEnabled) this.render();
     });
     canvas.addEventListener('mouseleave', () => { 
@@ -600,6 +712,14 @@ class CandleChart{
       
       if (pointers.size === 1){
         const localX = e.clientX-rect.left, localY = e.clientY-rect.top;
+        const hitLine = this._hitPriceLine(localX, localY);
+        if (hitLine){
+          mode = 'dragline';
+          this.draggingLine = hitLine;
+          canvas.style.cursor = 'ns-resize';
+          dragStartX = e.clientX; dragStartY = e.clientY;
+          return;
+        }
         mode = this._zoneAt(localX, localY);
         dragStartX = e.clientX; dragStartY = e.clientY;
         
@@ -635,7 +755,13 @@ class CandleChart{
       if (pointers.size !== 1) return;
       const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
 
-      if (mode === 'pan'){
+      if (mode === 'dragline'){
+        const rect = canvas.getBoundingClientRect();
+        const localY = e.clientY - rect.top;
+        const price = this.priceAtY(localY);
+        if (price != null && this.onPriceLineDrag) this.onPriceLineDrag(this.draggingLine.label, price);
+        return;
+      } else if (mode === 'pan'){
         this.followLatest = false;
         const maxAllowedEnd = this.maxEndFloat + this.viewCount * 0.9;
         const minAllowedEnd = 10;
@@ -663,6 +789,14 @@ class CandleChart{
       }
     });
     const endPointer = (e)=>{
+      if (mode === 'dragline' && this.draggingLine){
+        const rect = canvas.getBoundingClientRect();
+        const localY = e.clientY - rect.top;
+        const price = this.priceAtY(localY);
+        if (price != null && this.onPriceLineDrop) this.onPriceLineDrop(this.draggingLine.label, price);
+        this.draggingLine = null;
+        canvas.style.cursor = 'crosshair';
+      }
       pointers.delete(e.pointerId);
       if (pointers.size < 2) pinchStartDist = 0;
       if (pointers.size === 0) mode = null;
@@ -888,6 +1022,26 @@ class CandleChart{
       ctx.fillRect(W-pad.right, y-9, pad.right-2, 18);
       ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline='middle'; ctx.font='bold 11px system-ui, sans-serif';
       ctx.fillText(last.close.toFixed(2), W-pad.right+6, y);
+
+      // ---- Candle close countdown (TradingView-style) ----
+      if (this.live && this.live.tfMinutes){
+        const closeAt = last.time + this.live.tfMinutes*60;
+        const remain = Math.max(0, closeAt - this.live.lastBarTime);
+        let label;
+        if (remain >= 3600) label = Math.floor(remain/3600)+'h '+Math.floor((remain%3600)/60)+'m';
+        else {
+          const mm = Math.floor(remain/60), ss = Math.floor(remain%60);
+          label = String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');
+        }
+        const cdY = y + 19;
+        ctx.fillStyle = c.panel2 || (up ? c.up : c.down);
+        ctx.globalAlpha = 0.92;
+        ctx.fillRect(W-pad.right, cdY-8, pad.right-2, 16);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = c.axis; ctx.lineWidth = 1; ctx.strokeRect(W-pad.right, cdY-8, pad.right-2, 16);
+        ctx.fillStyle = c.text; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '10px system-ui, sans-serif';
+        ctx.fillText('⏱ '+label, W-pad.right + (pad.right-2)/2, cdY);
+      }
     }
     
     // ---- SUB PANEL RENDERING ----
@@ -1007,7 +1161,7 @@ let selectedTf = 5;
 let chartStyle = "candle";
 
 let isPlaying = false;
-let speed = 300; 
+let speed = 1; 
 let lastRealTime = performance.now();
 let rAF_ID = null;
 let audioCtx = null;
@@ -1018,9 +1172,13 @@ const toggles = {
 };
 const settings = { sound: false };
 
-let position = 0, entryPrice = 0, posQty = 0, tpPrice = null, slPrice = null;
+let position = 0, entryPrice = 0, posQty = 0, tpPrice = null, slPrice = null, posRiskPerUnit = null;
 let tradeLog = [];
 let equityCurve = [0];
+let accountCapital = 100000;
+const LS_CAPITAL = 'nti_capital';
+const savedCapital = parseFloat(lsGet(LS_CAPITAL));
+if (!isNaN(savedCapital) && savedCapital > 0) accountCapital = savedCapital;
 
 const $ = id => document.getElementById(id);
 const el = {
@@ -1029,17 +1187,45 @@ const el = {
   sesHigh:$('sesHigh'), sesLow:$('sesLow'), sesRegime:$('sesRegime'), sesTime:$('sesTime'),
   
   sideQty:$('sideQty'), sideTp:$('sideTp'), sideSl:$('sideSl'),
-  sideBuy:$('sideBuy'), sideSell:$('sideSell'), sideClosePos:$('sideClosePos'),
+  sideBuy:$('sideBuy'), sideSell:$('sideSell'), sideClosePos:$('sideClosePos'), sideReverse:$('sideReverse'),
 
-  mTrades:$('mTrades'), mWinRate:$('mWinRate'), mTotalPnl:$('mTotalPnl'), mPF:$('mPF'),
-  mAvgWin:$('mAvgWin'), mAvgLoss:$('mAvgLoss'), mBest:$('mBest'), mWorst:$('mWorst'), mDD:$('mDD'),
+  mTrades:$('mTrades'), mWinRate:$('mWinRate'), mTotalPnl:$('mTotalPnl'), mPF:$('mPF'), mROI:$('mROI'),
+  mAvgWin:$('mAvgWin'), mAvgLoss:$('mAvgLoss'), mBest:$('mBest'), mWorst:$('mWorst'), mDD:$('mDD'), mDDPct:$('mDDPct'),
   mExp:$('mExp'), mWinStreak:$('mWinStreak'), mLossStreak:$('mLossStreak'),
+  mAvgR:$('mAvgR'), mLongWR:$('mLongWR'), mShortWR:$('mShortWR'), mExitMix:$('mExitMix'),
   logBody:$('logBody'), logEmpty:$('logEmpty'), side:$('side'), eqSpark:$('eqSpark'),
   jumpLive:$('btnJumpLive')
 };
 
 const chart = new CandleChart($('chartCanvas'));
 chart.onFollowChange = (following) => { el.jumpLive.classList.toggle('show', !following); };
+
+// ---- Drag TP/SL directly on the chart ----
+chart.onPriceLineDrag = (label, price) => {
+  if (position === 0) return;
+  const line = chart.priceLines.find(l => l.label === label);
+  if (line) line.price = +price.toFixed(2);
+  chart.render();
+};
+chart.onPriceLineDrop = (label, price) => {
+  if (position === 0) return;
+  const cur = currentLivePrice();
+  price = +price.toFixed(2);
+  if (label.startsWith('TP')){
+    // Target must stay on the profit side of current price
+    if (position === 1 && price <= cur) price = +(cur + 0.05).toFixed(2);
+    if (position === -1 && price >= cur) price = +(cur - 0.05).toFixed(2);
+    tpPrice = price;
+    el.sideTp.value = Math.abs(+(tpPrice - entryPrice).toFixed(2)) || Math.abs(+(tpPrice - cur).toFixed(2));
+  } else if (label.startsWith('SL')){
+    if (position === 1 && price >= cur) price = +(cur - 0.05).toFixed(2);
+    if (position === -1 && price <= cur) price = +(cur + 0.05).toFixed(2);
+    slPrice = price;
+    el.sideSl.value = Math.abs(+(slPrice - entryPrice).toFixed(2)) || Math.abs(+(slPrice - cur).toFixed(2));
+  }
+  updatePositionPanel(cur);
+  tickChartAndTrades();
+};
 
 function genRegimeBars(startPrice, numSteps, stepSeconds, opts){
   const bars = []; let price = startPrice; const anchor = startPrice;
@@ -1387,8 +1573,8 @@ function tickChartAndTrades() {
 
   if (position !== 0){
     lines.push({ price:entryPrice, color:'#e5e7eb', label:'Entry', width:1.4 });
-    if (tpPrice != null) lines.push({ price:tpPrice, color:'#22c55e', label:'TP', dashed:true, width:1.4 });
-    if (slPrice != null) lines.push({ price:slPrice, color:'#ef4444', label:'SL', dashed:true, width:1.4 });
+    if (tpPrice != null) lines.push({ price:tpPrice, color:'#22c55e', label:'TP ✥', dashed:true, width:2, draggable:true });
+    if (slPrice != null) lines.push({ price:slPrice, color:'#ef4444', label:'SL ✥', dashed:true, width:2, draggable:true });
   }
 
   chart._tf = selectedTf;
@@ -1493,6 +1679,7 @@ function refreshTradeButtons(){
   el.sideClosePos.disabled = noPos;
   el.sideTp.disabled = !noPos;
   el.sideSl.disabled = !noPos;
+  refreshChartDock();
 }
 function openPosition(dir){
   if (position !== 0) return;
@@ -1503,15 +1690,17 @@ function openPosition(dir){
   const slPts = parseFloat(el.sideSl.value);
   tpPrice = (tpPts > 0) ? +(price + dir*tpPts).toFixed(2) : null;
   slPrice = (slPts > 0) ? +(price - dir*slPts).toFixed(2) : null;
+  posRiskPerUnit = (slPts > 0) ? slPts : null;
   refreshTradeButtons(); updatePositionPanel(price); tickChartAndTrades();
   beep(dir===1?760:520, 90);
 }
 function executeClose(price, reason){
   if (position === 0) return;
   const pnl = (position === 1 ? (price - entryPrice) : (entryPrice - price)) * posQty;
-  tradeLog.unshift({ sym: currentTicker, dir: position, entry: entryPrice, exit: price, qty: posQty, pnl, reason });
+  const rMultiple = posRiskPerUnit ? +(((pnl/posQty)/posRiskPerUnit).toFixed(2)) : null;
+  tradeLog.unshift({ sym: currentTicker, dir: position, entry: entryPrice, exit: price, qty: posQty, pnl, reason, r: rMultiple });
   equityCurve.push(equityCurve[equityCurve.length-1] + pnl);
-  position = 0; entryPrice = 0; posQty = 0; tpPrice = null; slPrice = null;
+  position = 0; entryPrice = 0; posQty = 0; tpPrice = null; slPrice = null; posRiskPerUnit = null;
   refreshTradeButtons(); updatePositionPanel(price);
   renderMetrics(); saveTrades();
   beep(pnl>=0?880:340, 110);
@@ -1521,35 +1710,65 @@ function closePosition(){
   executeClose(currentLivePrice(), 'MANUAL');
   tickChartAndTrades();
 }
+function reversePosition(){
+  if (position === 0) return;
+  const newDir = -position;
+  const q = posQty;
+  const tpPts = parseFloat(el.sideTp.value);
+  const slPts = parseFloat(el.sideSl.value);
+  executeClose(currentLivePrice(), 'REVERSE');
+  const price = currentLivePrice();
+  position = newDir; entryPrice = price; posQty = q;
+  tpPrice = (tpPts > 0) ? +(price + newDir*tpPts).toFixed(2) : null;
+  slPrice = (slPts > 0) ? +(price - newDir*slPts).toFixed(2) : null;
+  posRiskPerUnit = (slPts > 0) ? slPts : null;
+  refreshTradeButtons(); updatePositionPanel(price); tickChartAndTrades();
+  beep(newDir===1?760:520, 90);
+}
 
 function renderSparkline(){
   const cvs = el.eqSpark, ctx = cvs.getContext('2d');
   const dpr = window.devicePixelRatio||1;
   const rect = cvs.getBoundingClientRect();
-  cvs.width = Math.round(rect.width*dpr); cvs.height = Math.round(50*dpr);
+  const H = 90;
+  cvs.width = Math.round(rect.width*dpr); cvs.height = Math.round(H*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  const W = rect.width, H = 50;
+  const W = rect.width;
   ctx.clearRect(0,0,W,H);
   const data = equityCurve;
   if (data.length<2) return;
   let mn=Math.min(...data), mx=Math.max(...data);
   if (mn===mx){ mn-=1; mx+=1; }
+  const yFor = v => H - ((v-mn)/(mx-mn))*H;
+  const xFor = i => i/(data.length-1)*W;
+
+  // drawdown shading (peak-to-current)
+  let peak = data[0];
+  ctx.fillStyle = 'rgba(239,83,80,0.14)';
+  ctx.beginPath(); ctx.moveTo(xFor(0), yFor(data[0]));
+  data.forEach((v,i)=>{ peak = Math.max(peak, v); ctx.lineTo(xFor(i), yFor(v)); });
+  for (let i=data.length-1;i>=0;i--){ let pk=data[0]; for(let j=0;j<=i;j++) pk=Math.max(pk,data[j]); ctx.lineTo(xFor(i), yFor(pk)); }
+  ctx.closePath(); ctx.fill();
+
   ctx.strokeStyle = data[data.length-1]>=data[0] ? '#26a69a' : '#ef5350';
-  ctx.lineWidth = 1.6; ctx.beginPath();
-  data.forEach((v,i) => {
-    const x = i/(data.length-1)*W;
-    const y = H - ((v-mn)/(mx-mn))*H;
-    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-  });
+  ctx.lineWidth = 1.8; ctx.beginPath();
+  data.forEach((v,i) => { const x=xFor(i), y=yFor(v); if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
   ctx.stroke();
+
+  // zero-PnL baseline
+  if (mn < 0 && mx > 0){
+    ctx.strokeStyle = 'rgba(125,134,149,0.5)'; ctx.setLineDash([3,3]); ctx.lineWidth=1;
+    const y0 = yFor(0);
+    ctx.beginPath(); ctx.moveTo(0,y0); ctx.lineTo(W,y0); ctx.stroke(); ctx.setLineDash([]);
+  }
 }
 
 function renderMetrics(){
   const n = tradeLog.length;
   el.mTrades.textContent = n;
   if (n === 0){
-    ['mWinRate','mTotalPnl','mPF','mAvgWin','mAvgLoss','mBest','mWorst','mDD','mExp','mWinStreak','mLossStreak'].forEach(k=>el[k].textContent='—');
-    el.mTotalPnl.textContent='₹ 0';
+    ['mWinRate','mTotalPnl','mPF','mROI','mAvgWin','mAvgLoss','mBest','mWorst','mDD','mDDPct','mExp','mWinStreak','mLossStreak','mAvgR','mLongWR','mShortWR'].forEach(k=>el[k].textContent='—');
+    el.mTotalPnl.textContent='₹ 0'; el.mExitMix.textContent='—';
     el.logBody.innerHTML=''; el.logEmpty.style.display='block';
     renderSparkline();
     return;
@@ -1579,17 +1798,209 @@ function renderMetrics(){
   el.mBest.textContent = '₹ ' + tradeLog.reduce((m,t)=>Math.max(m,t.pnl), -Infinity).toFixed(2);
   el.mWorst.textContent = '₹ ' + tradeLog.reduce((m,t)=>Math.min(m,t.pnl), Infinity).toFixed(2);
   el.mDD.textContent = '₹ ' + maxDD.toFixed(2);
+  const ddPeakEquity = accountCapital + peak;
+  el.mDDPct.textContent = ddPeakEquity>0 ? (maxDD/ddPeakEquity*100).toFixed(2)+'%' : '—';
+  el.mROI.textContent = accountCapital>0 ? (total/accountCapital*100).toFixed(2)+'%' : '—';
+  el.mROI.className = total>=0 ? 'val pnl-pos' : 'val pnl-neg';
   el.mExp.textContent = '₹ ' + expectancy.toFixed(2);
   el.mWinStreak.textContent = winStreak;
   el.mLossStreak.textContent = lossStreak;
 
+  const rTrades = tradeLog.filter(t => t.r != null);
+  el.mAvgR.textContent = rTrades.length ? (rTrades.reduce((s,t)=>s+t.r,0)/rTrades.length).toFixed(2)+'R' : '—';
+
+  const longs = tradeLog.filter(t=>t.dir===1), shorts = tradeLog.filter(t=>t.dir===-1);
+  el.mLongWR.textContent = longs.length ? (longs.filter(t=>t.pnl>0).length/longs.length*100).toFixed(1)+'% ('+longs.length+')' : '—';
+  el.mShortWR.textContent = shorts.length ? (shorts.filter(t=>t.pnl>0).length/shorts.length*100).toFixed(1)+'% ('+shorts.length+')' : '—';
+
+  const slCount = tradeLog.filter(t=>t.reason==='SL').length;
+  const tpCount = tradeLog.filter(t=>t.reason==='TP').length;
+  const otherCount = n - slCount - tpCount;
+  el.mExitMix.textContent = `${slCount} / ${tpCount} / ${otherCount}`;
+
   el.logBody.innerHTML = tradeLog.slice(0,50).map(t => `<tr>
       <td>${t.sym}</td><td class="${t.dir===1?'badge-long':'badge-short'}">${t.dir===1?'LONG':'SHORT'}</td>
       <td>${t.entry.toFixed(2)}</td><td>${t.exit.toFixed(2)}</td><td>${t.qty}</td>
-      <td class="${t.pnl>=0?'pnl-pos':'pnl-neg'}">${t.pnl>=0?'+':''}${t.pnl.toFixed(2)}</td>
+      <td class="${t.pnl>=0?'pnl-pos':'pnl-neg'}">${t.pnl>=0?'+':''}${t.pnl.toFixed(2)}${t.r!=null?' ('+(t.r>=0?'+':'')+t.r.toFixed(1)+'R)':''}</td>
       <td>${t.reason||'Manual'}</td></tr>`).join('');
   renderSparkline();
 }
+
+/* ============================================================
+   Risk Calculator (NSE/BSE cash, F&O charge model)
+   ============================================================ */
+let rcDirection = 'long';
+const rc = {
+  capital:$('rcCapital'), riskPct:$('rcRiskPct'), riskAmt:$('rcRiskAmt'),
+  segment:$('rcSegment'), leverage:$('rcLeverage'), levRow:$('rcLevRow'), lot:$('rcLot'), lotRow:$('rcLotRow'),
+  entry:$('rcEntry'), sl:$('rcSl'), tp:$('rcTp'), ruin:$('rcRuin'),
+  qty:$('rcQty'), qtyLbl:$('rcQtyLbl'), riskUnit:$('rcRiskUnit'), notional:$('rcNotional'), margin:$('rcMargin'),
+  warn:$('rcWarn'), charges:$('rcCharges'), be:$('rcBE'),
+  chBrok:$('rcChBrok'), chStt:$('rcChStt'), chExch:$('rcChExch'), chStamp:$('rcChStamp'), chGst:$('rcChGst'),
+  tbody:$('rcTableBody')
+};
+
+function rcGetCharges(entry, exit, qty, segment){
+  const buyVal = entry*qty, sellVal = exit*qty, turnover = buyVal+sellVal;
+  let brok=0, stt=0, exch=0, stamp=0, notice='';
+  const sebi = turnover * 0.000001;
+  if (segment === 'delivery'){
+    brok = 0; stt = turnover*0.001; exch = turnover*0.0000297; stamp = buyVal*0.00015;
+  } else if (segment === 'intraday'){
+    const bB = buyVal*0.0003, sB = sellVal*0.0003;
+    brok = Math.min(20,bB)+Math.min(20,sB); stt = sellVal*0.00025; exch = turnover*0.0000297; stamp = buyVal*0.00003;
+    if (bB>20||sB>20) notice = 'Max ₹20/order cap hit';
+  } else if (segment === 'futures'){
+    const bB = buyVal*0.0003, sB = sellVal*0.0003;
+    brok = Math.min(20,bB)+Math.min(20,sB); stt = sellVal*0.0002; exch = turnover*0.0000173; stamp = buyVal*0.00002;
+    if (bB>20||sB>20) notice = 'Max ₹20/order cap hit';
+  } else if (segment === 'options'){
+    brok = 40; stt = sellVal*0.001; exch = turnover*0.0003503; stamp = buyVal*0.00003; notice = 'Flat ₹20/order';
+  }
+  const gst = (brok+exch+sebi)*0.18;
+  return { brok, stt, exch:exch+sebi, stamp, gst, total: brok+stt+exch+sebi+stamp+gst, notice };
+}
+
+function rcSetDirection(dir){
+  rcDirection = dir;
+  $('rcDirLong').classList.toggle('active', dir==='long');
+  $('rcDirShort').classList.toggle('active', dir==='short');
+  calcRisk();
+}
+
+function rcSyncSegmentUI(){
+  const seg = rc.segment.value;
+  rc.levRow.style.display = seg === 'intraday' ? 'flex' : 'none';
+  rc.lotRow.style.display = (seg === 'futures' || seg === 'options') ? 'flex' : 'none';
+}
+
+function calcRisk(){
+  const cap = parseFloat(rc.capital.value)||0;
+  const riskAmt = parseFloat(rc.riskAmt.value)||0;
+  const entry = parseFloat(rc.entry.value)||0;
+  const sl = parseFloat(rc.sl.value)||0;
+  const seg = rc.segment.value;
+  const lev = seg==='intraday' ? (parseInt(rc.leverage.value)||1) : 1;
+  const lot = (seg==='futures'||seg==='options') ? (parseInt(rc.lot.value)||1) : 1;
+  const customTp = parseFloat(rc.tp.value);
+
+  rc.ruin.textContent = (riskAmt>0 && cap>0) ? `Survival: ${Math.floor(cap/riskAmt)} consecutive losses` : 'Survival: — losses';
+
+  let riskPerUnit = Math.abs(entry-sl); if (riskPerUnit===0) riskPerUnit = 0.0001;
+  let rawQty = riskAmt/riskPerUnit;
+  let displayQty, absoluteQty;
+  if (seg==='futures'||seg==='options'){
+    displayQty = Math.floor(rawQty/lot); if (displayQty<1 && rawQty>0) displayQty=1;
+    absoluteQty = displayQty*lot;
+  } else {
+    displayQty = Math.floor(rawQty); absoluteQty = displayQty;
+  }
+
+  let marginPerUnit = entry;
+  if (seg==='intraday') marginPerUnit = entry/lev;
+  if (seg==='futures') marginPerUnit = entry*0.12;
+  if (seg==='options' && rcDirection==='short') marginPerUnit = entry*0.15;
+  const maxQtyAllowed = Math.floor(cap/marginPerUnit);
+
+  let isCapped = false, originalQty = displayQty;
+  if (absoluteQty > maxQtyAllowed && maxQtyAllowed>0){
+    isCapped = true; absoluteQty = maxQtyAllowed;
+    if (seg==='futures'||seg==='options'){ displayQty = Math.floor(absoluteQty/lot); absoluteQty = displayQty*lot; }
+    else displayQty = absoluteQty;
+  }
+
+  const notional = absoluteQty*entry, marginReq = absoluteQty*marginPerUnit;
+  rc.qty.textContent = displayQty.toLocaleString();
+  rc.qtyLbl.textContent = (seg==='futures'||seg==='options') ? `LOTS (${absoluteQty} QTY)` : 'SHARES';
+  rc.riskUnit.textContent = '₹'+riskPerUnit.toFixed(2);
+  rc.notional.textContent = '₹'+notional.toLocaleString('en-IN',{maximumFractionDigits:0});
+  rc.margin.textContent = '₹'+marginReq.toLocaleString('en-IN',{maximumFractionDigits:0});
+
+  if (isCapped){
+    rc.warn.style.display = 'block';
+    rc.warn.textContent = `Capital caps qty at ${displayQty} (risk-based size was ${originalQty}).`;
+  } else rc.warn.style.display = 'none';
+
+  // True breakeven (iterative)
+  if (absoluteQty>0){
+    let be = entry;
+    const isLong = rcDirection==='long';
+    for (let i=0;i<3;i++){
+      const c = rcGetCharges(entry, be, absoluteQty, seg);
+      const costPerUnit = c.total/absoluteQty;
+      be = isLong ? entry+costPerUnit : entry-costPerUnit;
+    }
+    rc.be.textContent = '₹'+Math.max(0,be).toFixed(2);
+  } else rc.be.textContent = '₹0.00';
+
+  let targets = [{ name:'STOP LOSS', px:sl, r:-1, isSL:true }];
+  [1,2,3,4].forEach(r => {
+    const px = rcDirection==='long' ? entry+riskPerUnit*r : entry-riskPerUnit*r;
+    targets.push({ name:`${r}R`, px, r, isSL:false });
+  });
+  if (!isNaN(customTp) && customTp>0){
+    const isProfit = (rcDirection==='long' && customTp>entry) || (rcDirection==='short' && customTp<entry);
+    if (isProfit) targets.push({ name:'CUSTOM', px:customTp, r:Math.abs(customTp-entry)/riskPerUnit, isSL:false });
+  }
+  targets.sort((a,b)=> rcDirection==='long' ? a.px-b.px : b.px-a.px);
+
+  const tp1 = targets.find(t=>t.r>0);
+  if (absoluteQty>0 && tp1){
+    const c = rcGetCharges(entry, tp1.px, absoluteQty, seg);
+    rc.charges.textContent = '₹'+c.total.toFixed(2);
+    rc.chBrok.textContent = c.brok.toFixed(2); rc.chStt.textContent = c.stt.toFixed(2);
+    rc.chExch.textContent = c.exch.toFixed(2); rc.chStamp.textContent = c.stamp.toFixed(2); rc.chGst.textContent = c.gst.toFixed(2);
+  } else {
+    rc.charges.textContent = '₹0.00';
+    ['chBrok','chStt','chExch','chStamp','chGst'].forEach(k=>rc[k].textContent='0.00');
+  }
+
+  if (absoluteQty===0){ rc.tbody.innerHTML=''; return; }
+  rc.tbody.innerHTML = targets.map(t => {
+    const gross = rcDirection==='long' ? (t.px-entry)*absoluteQty : (entry-t.px)*absoluteQty;
+    const c = rcGetCharges(entry, t.px, absoluteQty, seg);
+    const net = gross - c.total;
+    const roi = marginReq>0 ? (net/marginReq)*100 : 0;
+    const cls = t.isSL ? 'badge-short' : (t.name==='CUSTOM' ? '' : 'badge-long');
+    const pnlCls = net>=0 ? 'pnl-pos' : 'pnl-neg';
+    return `<tr><td class="${cls}">${t.name}</td><td>${t.r.toFixed(2)}R</td><td>₹${t.px.toFixed(2)}</td>
+      <td class="${pnlCls}">${net>=0?'+':''}₹${net.toFixed(2)}</td><td class="${pnlCls}">${roi>=0?'+':''}${roi.toFixed(1)}%</td></tr>`;
+  }).join('');
+}
+
+rc.segment.onchange = () => { rcSyncSegmentUI(); calcRisk(); };
+[rc.capital, rc.riskAmt, rc.leverage, rc.lot, rc.entry, rc.sl, rc.tp].forEach(inp => inp.addEventListener('input', calcRisk));
+rc.riskPct.addEventListener('input', () => {
+  const cap = parseFloat(rc.capital.value)||0;
+  rc.riskAmt.value = (cap*(parseFloat(rc.riskPct.value)||0)/100).toFixed(2);
+  calcRisk();
+});
+rc.riskAmt.addEventListener('input', () => {
+  const cap = parseFloat(rc.capital.value)||0;
+  if (cap>0) rc.riskPct.value = ((parseFloat(rc.riskAmt.value)||0)/cap*100).toFixed(2);
+});
+rc.capital.addEventListener('input', () => {
+  accountCapital = parseFloat(rc.capital.value)||100000;
+  lsSet(LS_CAPITAL, accountCapital);
+  rc.riskPct.dispatchEvent(new Event('input'));
+  renderMetrics();
+});
+$('rcDirLong').onclick = () => rcSetDirection('long');
+$('rcDirShort').onclick = () => rcSetDirection('short');
+$('rcPullChart').onclick = () => { rc.entry.value = currentLivePrice().toFixed(2); calcRisk(); };
+$('rcApply').onclick = () => {
+  const seg = rc.segment.value;
+  const qty = (seg==='futures'||seg==='options') ? parseInt(rc.qty.textContent.replace(/,/g,''))*(parseInt(rc.lot.value)||1) : parseInt(rc.qty.textContent.replace(/,/g,''));
+  if (qty>0){
+    el.sideQty.value = qty; syncQtyInputs('sideQty');
+    const entry = parseFloat(rc.entry.value)||0, sl = parseFloat(rc.sl.value)||0, tp = parseFloat(rc.tp.value);
+    el.sideSl.value = Math.abs(entry-sl).toFixed(2);
+    if (!isNaN(tp) && tp>0) el.sideTp.value = Math.abs(tp-entry).toFixed(2);
+    $('rcDetails').open = false;
+  }
+};
+rc.capital.value = accountCapital;
+rcSyncSegmentUI();
 
 /* ============================================================
    Wiring UI Events & Hotkeys
@@ -1614,6 +2025,7 @@ $('speedSel').onchange = e => { speed = parseFloat(e.target.value); if (!isPlayi
 el.sideBuy.onclick = () => openPosition(1);
 el.sideSell.onclick = () => openPosition(-1);
 el.sideClosePos.onclick = closePosition;
+el.sideReverse.onclick = reversePosition;
 $('btnResetStats').onclick = () => { tradeLog=[]; equityCurve=[0]; renderMetrics(); saveTrades(); };
 $('setSound').onchange = e => { settings.sound = e.target.checked; };
 
@@ -1627,9 +2039,27 @@ $('btnJumpLive').onclick = () => { chart.resetView(); tickChartAndTrades(); };
 document.querySelectorAll('.qtyStep').forEach(btn=>{
   btn.onclick = () => {
     const d = parseInt(btn.dataset.d);
-    el.sideQty.value = Math.max(1, (parseInt(el.sideQty.value)||1) + d);
+    const targetId = btn.dataset.target || 'sideQty';
+    const input = $(targetId);
+    input.value = Math.max(1, (parseInt(input.value)||1) + d);
+    syncQtyInputs(targetId);
   };
 });
+function syncQtyInputs(fromId){
+  const v = Math.max(1, parseInt($(fromId).value)||1);
+  $('sideQty').value = v; $('chartQty').value = v;
+}
+$('sideQty').addEventListener('input', ()=> syncQtyInputs('sideQty'));
+$('chartQty').addEventListener('input', ()=> syncQtyInputs('chartQty'));
+
+$('chartBuy').onclick = () => openPosition(1);
+$('chartSell').onclick = () => openPosition(-1);
+$('chartClose').onclick = closePosition;
+$('chartReverse').onclick = reversePosition;
+function refreshChartDock(){
+  const noPos = position === 0;
+  $('chartBuy').disabled = !noPos; $('chartSell').disabled = !noPos; $('chartClose').disabled = noPos; $('chartReverse').disabled = noPos;
+}
 
 const btnTheme = $('btnTheme');
 function applyThemeButtonLabel(){ btnTheme.textContent = document.body.classList.contains('theme-light') ? '☀️ Light' : '🌙 Dark'; }
@@ -1696,37 +2126,7 @@ document.addEventListener('keydown', e => {
   if (k==='b'){ openPosition(1); }
   else if (k==='s'){ openPosition(-1); }
   else if (k==='c'){ closePosition(); }
+  else if (k==='v'){ reversePosition(); }
   else if (k===' '){ e.preventDefault(); isPlaying ? pausePlayback() : startPlayback(); }
   else if (k==='r'){ $('btnReplay').click(); }
-  else if (k==='n'){ $('btnNext').click(); }
-  else if (k==='['){ const opts=[...$('speedSel').options].map(o=>parseFloat(o.value)); const idx=Math.max(0,opts.indexOf(speed)-1); speed=opts[idx]; $('speedSel').value=speed; if(isPlaying) startPlayback(); }
-  else if (k===']'){ const opts=[...$('speedSel').options].map(o=>parseFloat(o.value)); const idx=Math.min(opts.length-1,opts.indexOf(speed)+1); speed=opts[idx]; $('speedSel').value=speed; if(isPlaying) startPlayback(); }
-  else if (k>='1' && k<='9'){
-    const idx = parseInt(k)-1;
-    if (TF_LIST[idx]!==undefined){
-      selectedTf = TF_LIST[idx];
-      document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.tf)===selectedTf));
-      $('wmTf').textContent = tfLabel(selectedTf);
-      chart.resetView(); tickChartAndTrades();
-    }
-  }
-});
-
-/* ---- boot ---- */
-loadTrades();
-renderMetrics();
-if (document.body.classList.contains('theme-light')) chart.setTheme(true);
-loadNewStock();
-startPlayback();
-
-function hideSplash(){
-  const s = document.getElementById('splash');
-  if (!s) return; s.classList.add('splash-hide'); setTimeout(()=> s.remove(), 650);
-}
-if (document.readyState === 'complete') setTimeout(hideSplash, 1500);
-else window.addEventListener('load', ()=> setTimeout(hideSplash, 1500));
-
-})();
-</script>
-</body>
-</html>
+  
