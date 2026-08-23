@@ -87,6 +87,7 @@
   /* ---------------- on-chart quick trade dock ---------------- */
   .chart-dock{position:absolute;top:46px;right:78px;z-index:20;display:flex;align-items:center;gap:5px;
     background:rgba(18,22,31,.82);backdrop-filter:blur(4px);border:1px solid var(--border);border-radius:8px;padding:5px;box-shadow:0 4px 14px rgba(0,0,0,.35);}
+  .chart-dock.hidden { display: none !important; }
   .theme-light .chart-dock{background:rgba(255,255,255,.88);}
   .chart-dock-qty{display:flex;align-items:center;gap:2px;margin-right:2px;}
   .chart-dock-qty input{width:38px;text-align:center;padding:4px 2px;font-size:11px;}
@@ -259,6 +260,7 @@
       <button id="btnSessionBreaks" class="active">Session Breaks</button>
       <button id="btnGrid" class="active">Grid</button>
       <button id="btnWatermark" class="active">Watermark</button>
+      <button id="btnToggleDock" class="active">Trade Dock</button>
     </div>
   </div>
 
@@ -1025,8 +1027,8 @@ class CandleChart{
 
       // ---- Candle close countdown (TradingView-style) ----
       if (this.live && this.live.tfMinutes){
-        const closeAt = last.time + this.live.tfMinutes*60;
-        const remain = Math.max(0, closeAt - this.live.lastBarTime);
+        // Calculate remaining seconds exactly matching timeframe
+        const remain = Math.max(0, (this.live.tfMinutes * 60) - Math.floor(currentTradeSec % (this.live.tfMinutes * 60)));
         let label;
         if (remain >= 3600) label = Math.floor(remain/3600)+'h '+Math.floor((remain%3600)/60)+'m';
         else {
@@ -1686,11 +1688,21 @@ function openPosition(dir){
   const q = Math.max(1, parseInt(el.sideQty.value) || 1);
   const price = currentLivePrice();
   position = dir; entryPrice = price; posQty = q;
-  const tpPts = parseFloat(el.sideTp.value);
-  const slPts = parseFloat(el.sideSl.value);
-  tpPrice = (tpPts > 0) ? +(price + dir*tpPts).toFixed(2) : null;
-  slPrice = (slPts > 0) ? +(price - dir*slPts).toFixed(2) : null;
-  posRiskPerUnit = (slPts > 0) ? slPts : null;
+  
+  let tpPts = parseFloat(el.sideTp.value);
+  let slPts = parseFloat(el.sideSl.value);
+  
+  // Auto-assign default TP/SL if none provided so lines instantly appear on chart for dragging
+  if (isNaN(tpPts) || tpPts <= 0) tpPts = price * 0.01; // 1% default target
+  if (isNaN(slPts) || slPts <= 0) slPts = price * 0.005; // 0.5% default stop
+
+  tpPrice = +(price + dir*tpPts).toFixed(2);
+  slPrice = +(price - dir*slPts).toFixed(2);
+  posRiskPerUnit = slPts;
+  
+  el.sideTp.value = tpPts.toFixed(2);
+  el.sideSl.value = slPts.toFixed(2);
+
   refreshTradeButtons(); updatePositionPanel(price); tickChartAndTrades();
   beep(dir===1?760:520, 90);
 }
@@ -1714,14 +1726,24 @@ function reversePosition(){
   if (position === 0) return;
   const newDir = -position;
   const q = posQty;
-  const tpPts = parseFloat(el.sideTp.value);
-  const slPts = parseFloat(el.sideSl.value);
+  
   executeClose(currentLivePrice(), 'REVERSE');
   const price = currentLivePrice();
   position = newDir; entryPrice = price; posQty = q;
-  tpPrice = (tpPts > 0) ? +(price + newDir*tpPts).toFixed(2) : null;
-  slPrice = (slPts > 0) ? +(price - newDir*slPts).toFixed(2) : null;
-  posRiskPerUnit = (slPts > 0) ? slPts : null;
+  
+  let tpPts = parseFloat(el.sideTp.value);
+  let slPts = parseFloat(el.sideSl.value);
+  
+  if (isNaN(tpPts) || tpPts <= 0) tpPts = price * 0.01;
+  if (isNaN(slPts) || slPts <= 0) slPts = price * 0.005;
+
+  tpPrice = +(price + newDir*tpPts).toFixed(2);
+  slPrice = +(price - newDir*slPts).toFixed(2);
+  posRiskPerUnit = slPts;
+  
+  el.sideTp.value = tpPts.toFixed(2);
+  el.sideSl.value = slPts.toFixed(2);
+  
   refreshTradeButtons(); updatePositionPanel(price); tickChartAndTrades();
   beep(newDir===1?760:520, 90);
 }
@@ -2036,6 +2058,12 @@ $('btnSide').onclick = () => {
 $('btnMobileClosePanel').onclick = () => { el.side.classList.remove('show-mobile'); };
 $('btnJumpLive').onclick = () => { chart.resetView(); tickChartAndTrades(); };
 
+$('btnToggleDock').onclick = (e) => {
+  const dock = $('chartDock');
+  dock.classList.toggle('hidden');
+  e.currentTarget.classList.toggle('active');
+};
+
 document.querySelectorAll('.qtyStep').forEach(btn=>{
   btn.onclick = () => {
     const d = parseInt(btn.dataset.d);
@@ -2155,8 +2183,8 @@ function hideSplash(){
   const s = document.getElementById('splash');
   if (!s) return; s.classList.add('splash-hide'); setTimeout(()=> s.remove(), 650);
 }
-if (document.readyState === 'complete') setTimeout(hideSplash, 1500);
-else window.addEventListener('load', ()=> setTimeout(hideSplash, 1500));
+// Guaranteed trigger regardless of document state to prevent endless loop
+setTimeout(hideSplash, 1500);
 
 })();
 </script>
