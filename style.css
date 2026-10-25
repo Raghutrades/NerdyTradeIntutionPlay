@@ -248,3 +248,24 @@ table.tbl .btn{height:22px;padding:0 5px}
 .jr select,.jr input[type=text]{height:26px;font-size:11.5px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:0 6px;width:100%;min-width:0}
 table.tbl select{background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:6px}
 html[data-theme=light] #watermark{opacity:.05}
+
+/* footer range / scale buttons */
+.rng{display:inline-flex;gap:2px}
+.rng button{height:20px;padding:0 7px;border-radius:5px;background:transparent;border:0;color:var(--dim);font-size:11px;font-weight:600;cursor:pointer}
+.rng button:hover{background:var(--hover);color:var(--text)}
+.rng button.on{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.menu .mrow{flex-wrap:wrap}
+.menu .mrow .pair{flex-wrap:wrap;justify-content:flex-end}
+.menu{min-width:300px;max-width:min(92vw,420px)}
+/* about */
+.about{text-align:center;padding:8px 6px 18px}
+.about .logo{width:68px;height:68px;border-radius:18px;margin:6px auto 10px;display:block;box-shadow:var(--shadow)}
+.about h2{margin:0;font-size:20px}
+.about .by{color:var(--dim);margin:4px 0 14px;font-size:13px}
+.about p{max-width:520px;margin:8px auto;line-height:1.55;font-size:13px}
+.about .ig{display:inline-flex;align-items:center;gap:8px;margin:12px 0 4px;padding:10px 18px;border-radius:12px;background:linear-gradient(45deg,#f9a03f,#e1306c 50%,#833ab4);color:#fff;font-weight:700;text-decoration:none;font-size:14px}
+.about .chips2{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0}
+.about .chips2 span{padding:4px 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--border);font-size:11.5px}
+.about .fine{color:var(--dim);font-size:11px;margin-top:14px}
+
+@media (max-width:860px){#status #stNet{display:none}#status{gap:10px}}

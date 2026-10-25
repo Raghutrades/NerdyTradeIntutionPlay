@@ -28,7 +28,8 @@
     if (tf === 'D' || tf === 'W') return p.day + ' ' + MON[p.mon];
     return (p.h === 9 && p.m === 15) ? p.day + ' ' + MON[p.mon] : p2(p.h) + ':' + p2(p.m);
   };
-  N.fmtFull = (t, tf) => (typeof tf === 'number') ? N.fmtDM(t) + ' ' + N.fmtHM(t) : N.fmtDMY(t);
+  const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  N.fmtFull = (t, tf) => (typeof tf === 'number') ? DOW[istParts(t).dow] + ' ' + N.fmtDMY(t) + '  ' + N.fmtHM(t) : DOW[istParts(t).dow] + ' ' + N.fmtDMY(t);
   const weekKey = t => { const p = istParts(t); const d = new Date(Date.UTC(p.yr, p.mon, p.day)); const dd = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - dd); return d.getUTCFullYear() + '-' + d.getUTCMonth() + '-' + d.getUTCDate(); };
   const monthKey = t => { const p = istParts(t); return p.yr + '-' + p.mon; };
 
@@ -271,6 +272,39 @@
       step(st, b, cx) { if (cx.intraday && b.sessionIndex !== st.s) { st.cum = 0; st.s = b.sessionIndex; } st.cum += (b.close >= b.open ? b.volume : -b.volume); return st.cum; }
     }
   };
+
+  const ST = N.ind;
+  ST.emaC = p => ({ init: () => ({ e: null, n: 0 }), step(st, b) { const k = 2 / (p + 1); st.n++; st.e = st.e === null ? b.close : (b.close - st.e) * k + st.e; return st.n >= Math.min(p, 5) ? st.e : null; } });
+  // period VWAP (key function resets)
+  ST.vwapP = kind => ({
+    init: () => ({ cpv: 0, cv: 0, k: null }),
+    step(st, b) { const k = kind === 'W' ? weekKey(b.time) : kind === 'M' ? monthKey(b.time) : String(N.istDayKey(b.time)); if (k !== st.k) { st.k = k; st.cpv = 0; st.cv = 0; } const t = typ(b); st.cpv += t * b.volume; st.cv += b.volume; return st.cv ? st.cpv / st.cv : t; }
+  });
+  // previous-day VWAP as a step line through today
+  ST.vwapPD = {
+    init: () => ({ d: null, cpv: 0, cv: 0, prev: null }),
+    step(st, b) { const d = N.istDayKey(b.time); if (d !== st.d) { if (st.d !== null && st.cv) st.prev = st.cpv / st.cv; st.d = d; st.cpv = 0; st.cv = 0; } const t = typ(b); st.cpv += t * b.volume; st.cv += b.volume; return st.prev; }
+  };
+  // anchored VWAP from an absolute time with volume-weighted SD bands. returns {m, s}
+  ST.avwapT = {
+    init: () => ({ pv: 0, pv2: 0, v: 0 }),
+    step(st, b, cx) { if (b.time < cx.anchorT) return null; const t = typ(b); st.pv += t * b.volume; st.pv2 += t * t * b.volume; st.v += b.volume; const m = st.v ? st.pv / st.v : t, vr = st.v ? Math.max(0, st.pv2 / st.v - m * m) : 0; return { m, s: Math.sqrt(vr) }; }
+  };
+  // ADX / DI (Wilder RMA)
+  ST.adx = n => ({
+    init: () => ({ ph: null, pl: null, pc: null, tr: 0, dp: 0, dm: 0, cnt: 0, adx: null, dxs: [], atr: null, sp: 0, sm: 0, str: 0 }),
+    step(st, b) {
+      if (st.pc === null) { st.ph = b.high; st.pl = b.low; st.pc = b.close; return null; }
+      const up = b.high - st.ph, dn = st.pl - b.low, pdm = up > dn && up > 0 ? up : 0, mdm = dn > up && dn > 0 ? dn : 0, tr = Math.max(b.high - b.low, Math.abs(b.high - st.pc), Math.abs(b.low - st.pc));
+      st.ph = b.high; st.pl = b.low; st.pc = b.close; st.cnt++;
+      if (st.cnt <= n) { st.str += tr; st.sp += pdm; st.sm += mdm; if (st.cnt < n) return null; }
+      else { st.str = st.str - st.str / n + tr; st.sp = st.sp - st.sp / n + pdm; st.sm = st.sm - st.sm / n + mdm; }
+      const pdi = st.str ? 100 * st.sp / st.str : 0, mdi = st.str ? 100 * st.sm / st.str : 0, dx = pdi + mdi ? 100 * Math.abs(pdi - mdi) / (pdi + mdi) : 0;
+      if (st.adx === null) { st.dxs.push(dx); if (st.dxs.length < n) return { adx: null, pdi, mdi }; st.adx = st.dxs.reduce((a, c) => a + c, 0) / n; }
+      else st.adx = (st.adx * (n - 1) + dx) / n;
+      return { adx: st.adx, pdi, mdi };
+    }
+  });
   // fold over closed bars; returns {vals, st}
   N.foldInd = function (def, bars, cx) {
     const st = def.init(), vals = [];
@@ -320,6 +354,33 @@
     let oh, ol;
     if (m < orbN) { oh = Math.max(hiC, part.high); ol = Math.min(loC, part.low); } else { oh = s.hiPre[orbN - 1]; ol = s.loPre[orbN - 1]; }
     return { open: s.open, high: Math.max(hiC, part.high), low: Math.min(loC, part.low), orbH: oh, orbL: ol, orbDone };
+  };
+  /* ---------- time helpers for the axis / levels ---------- */
+  N.nextBarTime = function (t, tf) {
+    const p = istParts(t);
+    const skipWk = x => { let q = x, d = istParts(q).dow; while (d === 0 || d === 6) { q += 86400; d = istParts(q).dow; } return q; };
+    if (typeof tf === 'number') {
+      const mod = p.h * 60 + p.m - 555;
+      if (mod + tf >= SESSION_MIN) return skipWk(t - mod * 60 + 86400);
+      return t + tf * 60;
+    }
+    if (tf === 'D') return skipWk(t + 86400);
+    if (tf === 'W') return t + 7 * 86400;
+    const d = new Date(Date.UTC(p.yr, p.mon + 1, 1)); return Math.floor(d.getTime() / 1000) - IST + 3.75 * 3600;
+  };
+  N.istDayKey = t => Math.floor((t + IST) / 86400);
+  // first session index of the week / month that contains session si
+  const perCache = {};
+  M.periodStartSession = function (si, kind) {
+    const kf = kind === 'W' ? weekKey : monthKey, k = kind + M.seed + ':' + si; if (perCache[k] !== undefined) return perCache[k];
+    const key = kf(M.sessions[si].time); let j = si; while (j > 0 && kf(M.sessions[j - 1].time) === key) j--;
+    return (perCache[k] = j);
+  };
+  // weekly trend filter: +1 / -1 / 0 using completed weeks before this session's week (close vs EMA20)
+  M.weeklyTrend = function (si) {
+    const W = fullFor('W'), cd = HIST_DAYS + si; let wi = bsearch(W, 'd0', cd) - 1; if (wi < 20) return 0;
+    let e = W[0].close; const k = 2 / 21; for (let i = 1; i <= wi; i++) e = (W[i].close - e) * k + e;
+    return W[wi].close > e ? 1 : W[wi].close < e ? -1 : 0;
   };
   N.STOCKS = STOCKS;
 })(window.NTI);

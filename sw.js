@@ -1,8 +1,8 @@
 /* NerdyTradeIntuition service worker — offline-first app shell */
-const VERSION = 'nti-v2-1';
+const VERSION = 'nti-v2-3';
 const SHELL = ['./', 'index.html', 'style.css', 'manifest.webmanifest',
-  'js/core.js', 'js/data.js', 'js/chart.js', 'js/risk.js', 'js/stats.js', 'js/settings.js', 'js/app.js', 'js/pwa.js',
-  'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png'];
+  'core.js', 'data.js', 'chart.js', 'packs.js', 'risk.js', 'stats.js', 'settings.js', 'app.js', 'pwa.js',
+  'icon.svg', 'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('message', e => { if (e.data === 'skipWaiting') self.skipWaiting(); });

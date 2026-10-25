@@ -8,7 +8,7 @@
   const el = id => $(id);
   const mobile = () => window.matchMedia('(max-width:860px)').matches;
   const dayKey = t => Math.floor((t + 19800) / 86400);
-  const COL = { vwap: '#f5a623', avwap: '#3b82f6', ema9: '#e879f9', ema21: '#38bdf8', pd: '#ef5350', pw: '#818cf8', pm: '#f472b6', dayo: '#94a3b8', dayhl: '#fbbf24', orb: '#22d3ee' };
+  const COL = { vwap: '#f5a623', avwap: '#3b82f6', ema9: '#e879f9', ema21: '#38bdf8', pd: '#2f7bff', pw: '#ff9800', pm: '#b455e8', dayo: '#94a3b8', dayhl: '#fbbf24', orb: '#22d3ee', e13: '#00bcd4', e21: '#ff00c8', e50: '#ff9800', e200: '#ffffff', vWk: '#c84b00', vMo: '#aa00aa', vPd: '#008080', av: '#3b82f6', b1: '#22c55e', b2: '#f59e0b', b3: '#ef4444' };
 
   /* ======================= theme / config ======================= */
   function applyTheme() {
@@ -45,14 +45,39 @@
   const STYLES = [['candle', 'Candles', 'candles'], ['hollow', 'Hollow candles', 'hollow'], ['bar', 'OHLC bars', 'bars'], ['heikinashi', 'Heikin-Ashi', 'candles'], ['line', 'Line', 'line'], ['area', 'Area', 'area']];
   $('btnStyle').onclick = e => N.openMenu(e.currentTarget, () => [{ h: 'Chart style' }].concat(STYLES.map(s => ({ label: s[1], icon: s[2], on: C().style === s[0], fn: () => { C().style = s[0]; N.saveCfg(); refreshHeader(); refresh(); } }))));
   function toggleInd(k) { C().ind[k] = !C().ind[k]; N.saveCfg(); refreshHeader(); refresh(); }
-  $('btnInd').onclick = e => N.openMenu(e.currentTarget, () => [
-    { h: 'Overlays' },
-    { label: 'VWAP (session)', check: 1, on: C().ind.vwap, swatch: COL.vwap, keep: 1, fn: () => toggleInd('vwap') },
-    { label: '5-day anchored VWAP', check: 1, on: C().ind.avwap, swatch: COL.avwap, keep: 1, fn: () => toggleInd('avwap') },
-    { label: 'EMA 9', check: 1, on: C().ind.ema9, swatch: COL.ema9, keep: 1, fn: () => toggleInd('ema9') },
-    { label: 'EMA 21', check: 1, on: C().ind.ema21, swatch: COL.ema21, keep: 1, fn: () => toggleInd('ema21') },
-    { h: 'Sub-panel' }
-  ].concat([['none', 'None'], ['volume', 'Volume'], ['rsi', 'RSI (14)'], ['oi', 'OI flow (simulated)']].map(s => ({ label: s[1], check: 1, on: C().sub === s[0], keep: 1, fn: () => { C().sub = s[0]; N.saveCfg(); refreshHeader(); refresh(); } }))));
+  const flip = (g, k) => { C()[g][k] = !C()[g][k]; N.saveCfg(); S.pk = null; refreshHeader(); refresh(); };
+  const e200c = () => C().theme === 'dark' ? '#ffffff' : '#555a66';
+  $('btnInd').onclick = e => N.openMenu(e.currentTarget, () => {
+    const k1 = C().pk1, k2 = C().pk2, T = (g, k, t, on) => ({ t, on: on !== undefined ? on : C()[g][k], fn: () => flip(g, k) });
+    return [
+      { h: 'Built-in' },
+      { label: 'Volume (on chart)', check: 1, on: C().ind.vol, keep: 1, fn: () => toggleInd('vol') },
+      { label: 'VWAP (session)', check: 1, on: C().ind.vwap, swatch: COL.vwap, keep: 1, fn: () => toggleInd('vwap') },
+      { label: '5-day anchored VWAP', check: 1, on: C().ind.avwap, swatch: COL.avwap, keep: 1, fn: () => toggleInd('avwap') },
+      { label: 'EMA 9', check: 1, on: C().ind.ema9, swatch: COL.ema9, keep: 1, fn: () => toggleInd('ema9') },
+      { label: 'EMA 21', check: 1, on: C().ind.ema21, swatch: COL.ema21, keep: 1, fn: () => toggleInd('ema21') },
+      { h: 'Sub-panel' }
+    ].concat([['none', 'None'], ['rsi', 'RSI (14)'], ['oi', 'OI flow (simulated)']].map(s => ({ label: s[1], check: 1, on: C().sub === s[0], keep: 1, fn: () => { C().sub = s[0]; N.saveCfg(); refreshHeader(); refresh(); } }))).concat([
+      { h: 'NerdyIntruder · Market Structure + S/R + S/D + Candles' },
+      { label: 'Show this pack', check: 1, on: k1.on, keep: 1, fn: () => flip('pk1', 'on') },
+      { label: 'ILM | SP zig-zag', tog: [T('pk1', 'zzMajor', 'Major'), T('pk1', 'zzMinor', 'Minor')] },
+      { label: 'Zones', tog: [T('pk1', 'sd', 'Supply/Demand'), T('pk1', 'sr', 'S / R')] },
+      { label: 'Candles at S/R', tog: [T('pk1', 'cd', 'On')] },
+      { label: 'Patterns', tog: [T('pk1', 'pHammer', 'Hammer'), T('pk1', 'pInv', 'Inv/Star'), T('pk1', 'pEngulf', 'Engulf')] },
+      { label: '', tog: [T('pk1', 'pStars', 'Morning/Evening'), T('pk1', 'pBig', 'Big / wick bars')] },
+      { label: 'Text labels', tog: [T('pk1', 'labels', 'Show')] },
+      { h: 'NerdyIntruder · Fibs + VWAP + EMA + ADX + Volume Breakout' },
+      { label: 'Auto Fibs & PD/PW/PM H/L → see Levels menu', icon: 'levels', fn: () => $('btnLevels').click() },
+      { label: 'EMAs', swatch: COL.e21, tog: [T('pk2', 'ema', 'On'), T('pk2', 'e13', '13'), T('pk2', 'e21', '21'), T('pk2', 'e50', '50'), T('pk2', 'e200', '200')] },
+      { label: 'VWAPs', swatch: COL.vWk, tog: [T('pk2', 'vwap', 'On'), T('pk2', 'vWk', 'Week'), T('pk2', 'vMo', 'Month'), T('pk2', 'vPd', 'Prev day')] },
+      { label: 'Anchored VWAP + SD bands', swatch: COL.av, tog: [T('pk2', 'av', 'On'), T('pk2', 'b1', '1σ'), T('pk2', 'b2', '2σ'), T('pk2', 'b3', '3σ')] },
+      { label: C().anchorT ? 'Anchor: custom bar (tap to clear)' : 'Anchor: ' + k2.avDays + ' sessions back · tap to pick a bar', icon: 'anchor', fn: () => { if (C().anchorT) { C().anchorT = null; N.saveCfg(); refresh(); } else { setTool('anchor'); N.toast('Tap a candle to anchor the VWAP there', 'info'); } } },
+      { label: 'ADX dashboard', tog: [T('pk2', 'adx', 'Show')] },
+      { label: 'Volume breakout', tog: [T('pk2', 'vb', 'On'), T('pk2', 'vbLines', 'S/R lines'), T('pk2', 'vbMa', 'Avg vol')] },
+      { label: 'Breakout strictness', tog: ['Strict', 'Balanced', 'More'].map(x => ({ t: x, on: k2.vbPreset === x, fn: () => { C().pk2.vbPreset = x; N.saveCfg(); S.pk = null; refresh(); } })) },
+      { label: 'Text labels', tog: [T('pk2', 'labels', 'Show')] }
+    ]);
+  });
   function toggleLv(g, s) { C().lv[g][s] = !C().lv[g][s]; N.saveCfg(); refreshHeader(); refresh(); }
   function toggleLv1(k) { C().lv[k] = !C().lv[k]; N.saveCfg(); refreshHeader(); refresh(); }
   $('btnLevels').onclick = e => N.openMenu(e.currentTarget, () => [
@@ -68,7 +93,7 @@
     { label: 'Hide all levels', icon: 'eyeoff', keep: 1, fn: () => { const l = C().lv; ['pd', 'pw', 'pm'].forEach(g => { l[g].hl = false; l[g].fib = false; }); l.dayo = l.dayhl = l.orb = false; N.saveCfg(); refreshHeader(); refresh(); } }
   ]);
   function refreshHeader() {
-    const c = C(), indN = ['vwap', 'avwap', 'ema9', 'ema21'].filter(k => c.ind[k]).length + (c.sub !== 'none' ? 1 : 0);
+    const c = C(), indN = ['vwap', 'avwap', 'ema9', 'ema21'].filter(k => c.ind[k]).length + (c.sub !== 'none' ? 1 : 0) + (c.pk1.on ? 1 : 0) + ['ema', 'vwap', 'av', 'adx', 'vb'].filter(k => c.pk2[k]).length;
     const lvN = ['pd', 'pw', 'pm'].filter(g => c.lv[g].hl || c.lv[g].fib).length + ['dayo', 'dayhl', 'orb'].filter(k => c.lv[k]).length;
     $('btnInd').classList.toggle('on', indN > 0 && !c.naked); $('btnInd').querySelector('span').textContent = 'Indicators' + (indN ? ' · ' + indN : '');
     $('btnLevels').classList.toggle('on', lvN > 0 && !c.naked); $('btnLevels').querySelector('span').textContent = 'Levels' + (lvN ? ' · ' + lvN : '');
@@ -80,21 +105,21 @@
   function toggleNaked() { C().naked = !C().naked; N.saveCfg(); refreshHeader(); refresh(); N.toast(C().naked ? 'Naked price — indicators & levels hidden' : 'Indicators & levels restored', 'info'); }
   $('btnNaked').onclick = toggleNaked;
   $('btnTheme').onclick = () => { C().theme = C().theme === 'dark' ? 'light' : 'dark'; N.saveCfg(); applyTheme(); refresh(); renderPanels(true); N.sfx.click(); };
-  $('btnSettings').onclick = () => N.openSettings();
+  $('btnSettings').onclick = () => N.openSettings(); $('btnAbout').onclick = () => N.openSettings('about');
   $('btnShot').onclick = () => chart.toBlob(b => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = M.ticker + '-' + N.tfLabel(C().tf) + '-seed' + M.seed + '.png'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); N.toast('Screenshot saved', 'info'); });
   $('btnNext').onclick = () => newChart();
 
   /* ======================= rail / tools ======================= */
   function setTool(t) {
     S.tool = t; chart.setTool(t);
-    $('toolCursor').classList.toggle('on', t === 'cursor'); $('toolMeasure').classList.toggle('on', t === 'measure'); $('toolHline').classList.toggle('on', t === 'hline');
+    $('toolCursor').classList.toggle('on', t === 'cursor'); $('toolMeasure').classList.toggle('on', t === 'measure'); $('toolHline').classList.toggle('on', t === 'hline'); $('toolAnchor').classList.toggle('on', t === 'anchor');
   }
   function clearDrawings() { S.userLines = []; chart.measure = null; refresh(); }
   function syncRail() {
     const c = C(); $('railGrid').classList.toggle('on', c.gridMode !== 'none'); $('railBreaks').classList.toggle('on', c.showSessionBreaks); $('railCross').classList.toggle('on', c.showCrosshair);
   }
   $('toolCursor').onclick = () => setTool('cursor'); $('toolMeasure').onclick = () => setTool(S.tool === 'measure' ? 'cursor' : 'measure'); $('toolHline').onclick = () => setTool(S.tool === 'hline' ? 'cursor' : 'hline');
-  $('toolClear').onclick = clearDrawings;
+  $('toolClear').onclick = clearDrawings; $('toolAnchor').onclick = () => { if (S.tool === 'anchor') setTool('cursor'); else { setTool('anchor'); N.toast('Tap a candle to anchor the VWAP there', 'info'); } };
   $('railGrid').onclick = () => { C().gridMode = C().gridMode === 'none' ? 'both' : 'none'; N.saveCfg(); syncRail(); chart.render(); };
   $('railBreaks').onclick = () => { C().showSessionBreaks = !C().showSessionBreaks; N.saveCfg(); syncRail(); chart.render(); };
   $('railCross').onclick = () => { C().showCrosshair = !C().showCrosshair; N.saveCfg(); syncRail(); chart.render(); };
@@ -111,11 +136,22 @@
 
   /* ======================= chart data build ======================= */
   function indSeries(f, name, def, cx, forming) {
-    const key = f.key + '|' + name + '|' + cx.intraday + '|' + cx.emaReset + '|' + cx.anchor;
+    const key = f.key + '|' + name + '|' + cx.intraday + '|' + cx.emaReset + '|' + cx.anchor + '|' + cx.anchorT;
     let c = S.ic[name];
     if (!c || c.key !== key) { c = { key, res: N.foldInd(def, f.view.slice(0, f.formIdx), cx) }; S.ic[name] = c; }
     return N.extendInd(def, c.res, forming, cx);
   }
+  // object-valued indicators (anchored VWAP bands, ADX): cache closed-bar arrays per pick, append forming point
+  function indMulti(f, name, def, cx, forming, picks) {
+    const key = f.key + '|' + name + '|' + cx.anchorT; let c = S.ic[name];
+    if (!c || c.key !== key) { const res = N.foldInd(def, f.view.slice(0, f.formIdx), cx); c = { key, res, arr: picks.map(pk => res.vals.map(v => ({ time: v.time, value: pk(v.value) })).filter(v => v.value != null && isFinite(v.value))) }; S.ic[name] = c; }
+    const st = Object.assign({}, c.res.st), v = def.step(st, forming, cx);
+    return picks.map((pk, i) => { const x = v ? pk(v) : null; return x != null && isFinite(x) ? c.arr[i].concat([{ time: forming.time, value: x }]) : c.arr[i]; });
+  }
+  const firstIdxOfSession = (view, si) => { let lo = 0, hi = view.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (view[m].sessionIndex >= si) hi = m; else lo = m + 1; } return lo; };
+  const wkTrendMemo = {};
+  const trendOf = b => { if (b.sessionIndex === undefined) return 0; const k = M.seed + ':' + b.sessionIndex; if (wkTrendMemo[k] === undefined) wkTrendMemo[k] = M.weeklyTrend(b.sessionIndex); return wkTrendMemo[k]; };
+  function packKey(c) { return JSON.stringify([c.pk1, c.pk2.vb, c.pk2.vbPreset, c.pk2.vbLines, c.pk2.labels, c.upColor, c.downColor, c.naked]); }
   function fmtRemain(s) { s = Math.max(0, Math.ceil(s)); if (s >= 3600) return Math.floor(s / 3600) + 'h ' + String(Math.floor(s % 3600 / 60)).padStart(2, '0') + 'm'; return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
   const pnlOf = (P, px) => (px - P.entry) * P.dir * P.qty;
   function validTP(P, p, cur) { return P.dir === 1 ? Math.max(p, cur + TICK) : Math.min(p, cur - TICK); }
@@ -126,33 +162,69 @@
     const c = C(), tf = c.tf, f = M.series(tf, S.sec), ck = f.clock, part = f.part, price = part.close, intr = N.isIntraday(tf), forming = f.view[f.formIdx];
     S.price = price;
     if (f.key !== S.lastKey) { if (S.lastKey && S.playing) N.sfx.bar(); S.lastKey = f.key; }
-    const naked = c.naked, overlays = [], lines = [], zones = [], sub = { mode: naked ? 'none' : c.sub };
+    const naked = c.naked, overlays = [], lines = [], zones = [], sub = { mode: naked ? 'none' : c.sub }; let shapes = [], hud = null, hawkD = null;
     if (!naked) {
-      const cx = { intraday: intr, emaReset: c.emaReset, anchor: ck.sessionIndex - 5 };
-      const brk = intr ? { breakOnSession: true, session: dayKey } : {};
+      const cx = { intraday: intr, emaReset: c.emaResetDay, anchor: ck.sessionIndex - 5, anchorT: c.anchorT || 0 };
+      const brk = intr ? { breakOnSession: true, session: dayKey } : {}, brkE = intr && c.emaResetDay ? brk : {};
       if (c.ind.vwap && intr) overlays.push(Object.assign({ key: 'vwap', label: 'VWAP', color: COL.vwap, vals: indSeries(f, 'vwap', N.ind.vwap, cx, forming) }, brk));
       if (c.ind.avwap && intr && cx.anchor >= 0) overlays.push({ key: 'avwap', label: '5D AVWAP', color: COL.avwap, vals: indSeries(f, 'avwap', N.ind.avwap, cx, forming) });
-      if (c.ind.ema9) overlays.push(Object.assign({ key: 'ema9', label: 'EMA 9', color: COL.ema9, vals: indSeries(f, 'ema9', N.ind.ema(9), cx, forming) }, brk));
-      if (c.ind.ema21) overlays.push(Object.assign({ key: 'ema21', label: 'EMA 21', color: COL.ema21, vals: indSeries(f, 'ema21', N.ind.ema(21), cx, forming) }, brk));
+      if (c.ind.ema9) overlays.push(Object.assign({ key: 'ema9', label: 'EMA 9', color: COL.ema9, vals: indSeries(f, 'ema9', N.ind.ema(9), cx, forming) }, brkE));
+      if (c.ind.ema21) overlays.push(Object.assign({ key: 'ema21', label: 'EMA 21', color: COL.ema21, vals: indSeries(f, 'ema21', N.ind.ema(21), cx, forming) }, brkE));
       if (c.sub === 'rsi') sub.rsi = indSeries(f, 'rsi', N.ind.rsi, cx, forming);
       if (c.sub === 'oi') sub.oi = indSeries(f, 'oi', N.ind.oi, cx, forming);
+      // ---- pack 2 overlays ----
+      const k2 = c.pk2, lab = k2.labels;
+      if (k2.ema) [[13, 'e13'], [21, 'e21'], [50, 'e50'], [200, 'e200']].forEach(([n, k]) => { if (k2[k]) overlays.push({ key: 'pe' + n, label: 'EMA ' + n, color: k === 'e200' ? e200c() : COL[k], width: 1.8, vals: indSeries(f, 'pe' + n, N.ind.emaC(n), cx, forming) }); });
+      if (k2.vwap && intr) {
+        if (k2.vWk) overlays.push({ key: 'vwk', label: 'Wk VWAP', color: COL.vWk, width: 1.6, vals: indSeries(f, 'vwk', N.ind.vwapP('W'), cx, forming) });
+        if (k2.vMo) overlays.push({ key: 'vmo', label: 'Mo VWAP', color: COL.vMo, width: 1.6, vals: indSeries(f, 'vmo', N.ind.vwapP('M'), cx, forming) });
+        if (k2.vPd) overlays.push({ key: 'vpd', label: 'PD VWAP', color: COL.vPd, dots: true, vals: indSeries(f, 'vpd', N.ind.vwapPD, cx, forming) });
+      }
+      if (k2.av) {
+        const ancT = c.anchorT || (M.sessions[Math.max(0, ck.sessionIndex - k2.avDays)].time), cx2 = Object.assign({}, cx, { anchorT: ancT });
+        const arr = indMulti(f, 'avT', N.ind.avwapT, cx2, forming, [v => v.m, v => v.m + v.s, v => v.m - v.s, v => v.m + 2 * v.s, v => v.m - 2 * v.s, v => v.m + 3 * v.s, v => v.m - 3 * v.s]);
+        overlays.push({ key: 'av', label: 'AVWAP', color: COL.av, width: 2, vals: arr[0] });
+        if (k2.b1) { overlays.push({ key: 'av1u', color: COL.b1, width: 1, vals: arr[1], hide: 1 }, { key: 'av1d', color: COL.b1, width: 1, vals: arr[2], hide: 1 }); }
+        if (k2.b2) { overlays.push({ key: 'av2u', color: COL.b2, width: 1, vals: arr[3], hide: 1 }, { key: 'av2d', color: COL.b2, width: 1, vals: arr[4], hide: 1 }); }
+        if (k2.b3) { overlays.push({ key: 'av3u', color: COL.b3, width: 1, vals: arr[5], hide: 1 }, { key: 'av3d', color: COL.b3, width: 1, vals: arr[6], hide: 1 }); }
+      }
+      if (k2.adx) {
+        const cc = S.ic.adx; const key = f.key; let base = cc && cc.key === key ? cc : (S.ic.adx = { key, res: N.foldInd(N.ind.adx(14), f.view.slice(0, f.formIdx), cx) });
+        const st = Object.assign({}, base.res.st), v = N.ind.adx(14).step(st, forming, cx) || (base.res.vals.length ? base.res.vals[base.res.vals.length - 1].value : null);
+        if (v && v.adx != null) {
+          const strong = v.adx >= 25, bull = v.pdi > v.mdi, col = v.adx >= 25 ? (bull ? '#26a69a' : '#ef5350') : '#8a93a6';
+          hud = { title: 'ADX · DMI 14', rows: [['ADX', v.adx.toFixed(1), col], ['+DI', v.pdi.toFixed(1), '#26a69a'], ['−DI', v.mdi.toFixed(1), '#ef5350'], ['Trend', v.adx < 20 ? 'Weak / range' : v.adx < 25 ? 'Building' : v.adx < 40 ? (bull ? 'Strong ▲' : 'Strong ▼') : (bull ? 'Very strong ▲' : 'Very strong ▼'), col]] };
+        }
+      }
+      // ---- indicator-pack shapes (cached; recomputed per closed bar, throttled) ----
+      if (c.pk1.on || k2.vb) {
+        const pkey = packKey(c), nowT = performance.now();
+        if (!S.pk || S.pk.pkey !== pkey || (S.pk.fkey !== f.key && nowT - S.pk.t > 160)) {
+          const closed = f.view.slice(0, f.formIdx); let sh = [], hawk = null;
+          if (c.pk1.on) sh = sh.concat(N.packs.compute1(closed, Object.assign({}, c.pk1, { labels: c.pk1.labels }), c.upColor, c.downColor));
+          if (k2.vb) { const r = N.packs.compute2(closed, { preset: k2.vbPreset, labels: k2.labels, lines: k2.vbLines }, trendOf); sh = sh.concat(r.shapes); hawk = r.hawk; }
+          S.pk = { pkey, fkey: f.key, t: nowT, shapes: sh, hawk };
+        }
+        shapes = S.pk.shapes; hawkD = S.pk.hawk;
+      }
       // levels
       const lv = M.levelsFor(ck.sessionIndex), L = c.lv;
+      const sIdx = intr ? firstIdxOfSession(f.view, ck.sessionIndex) : null, startOf = k => !intr ? null : k === 'pd' ? sIdx : firstIdxOfSession(f.view, M.periodStartSession(ck.sessionIndex, k === 'pw' ? 'W' : 'M'));
       const grp = (key, nm, col) => {
-        const t = L[key], fl = lv[key]; if (!fl || (!t.hl && !t.fib)) return;
-        if (t.hl) { lines.push({ price: fl.hi, color: col, label: nm + 'H' }); lines.push({ price: fl.lo, color: col, label: nm + 'L' }); }
+        const t = L[key], fl = lv[key]; if (!fl || (!t.hl && !t.fib)) return; const fi = startOf(key);
+        if (t.hl) { lines.push({ price: fl.hi, color: col, label: nm + 'H', fromIdx: fi, width: key === 'pd' ? 1.2 : key === 'pw' ? 1.8 : 2.4 }); lines.push({ price: fl.lo, color: col, label: nm + 'L', fromIdx: fi, width: key === 'pd' ? 1.2 : key === 'pw' ? 1.8 : 2.4 }); }
         if (t.fib) {
           const fc = c.theme === 'dark' ? 'rgba(255,255,255,.55)' : 'rgba(0,0,0,.45)';
-          lines.push({ price: fl.l0, color: col, label: nm + ' 0', dashed: true, alpha: .8 }, { price: fl.l50, color: fc, label: nm + ' .5', dashed: true, tag: false }, { price: fl.l618, color: fc, label: nm + ' .618', dashed: true, tag: false }, { price: fl.l786, color: fc, label: nm + ' .786', dashed: true, tag: false }, { price: fl.l100, color: col, label: nm + ' 1', dashed: true, alpha: .8 });
-          zones.push({ from: fl.l50, to: fl.l618, color: 'rgba(255,193,7,.12)' });
+          lines.push({ price: fl.l0, color: col, label: nm + ' 0', dashed: true, alpha: .8, fromIdx: fi }, { price: fl.l50, color: fc, label: nm + ' .5', dashed: true, tag: false, fromIdx: fi }, { price: fl.l618, color: fc, label: nm + ' .618', dashed: true, tag: false, fromIdx: fi }, { price: fl.l786, color: fc, label: nm + ' .786', dashed: true, tag: false, fromIdx: fi }, { price: fl.l100, color: col, label: nm + ' 1', dashed: true, alpha: .8, fromIdx: fi });
+          zones.push({ from: fl.l50, to: fl.l618, color: 'rgba(255,193,7,.16)', fromIdx: fi });
         }
       };
       grp('pd', 'PD', COL.pd); grp('pw', 'PW', COL.pw); grp('pm', 'PM', COL.pm);
       if (L.dayo || L.dayhl || (L.orb && intr)) {
         const ds = M.dayStats(ck, part);
-        if (L.dayo) lines.push({ price: ds.open, color: COL.dayo, label: 'Day O', dashed: true });
-        if (L.dayhl) { lines.push({ price: ds.high, color: COL.dayhl, label: 'Day H' }, { price: ds.low, color: COL.dayhl, label: 'Day L' }); }
-        if (L.orb && intr) { lines.push({ price: ds.orbH, color: COL.orb, label: 'ORB H', dashed: ds.orbDone ? false : true }, { price: ds.orbL, color: COL.orb, label: 'ORB L', dashed: ds.orbDone ? false : true }); }
+        if (L.dayo) lines.push({ price: ds.open, color: COL.dayo, label: 'Day O', dashed: true, fromIdx: sIdx });
+        if (L.dayhl) { lines.push({ price: ds.high, color: COL.dayhl, label: 'Day H', fromIdx: sIdx }, { price: ds.low, color: COL.dayhl, label: 'Day L', fromIdx: sIdx }); }
+        if (L.orb && intr) { lines.push({ price: ds.orbH, color: COL.orb, label: 'ORB H', dashed: ds.orbDone ? false : true, fromIdx: sIdx }, { price: ds.orbL, color: COL.orb, label: 'ORB L', dashed: ds.orbDone ? false : true, fromIdx: sIdx }); }
       }
     }
     // user lines
@@ -177,7 +249,7 @@
     let cd = null;
     if (intr) cd = fmtRemain((Math.min((Math.floor(ck.minuteOfDay / tf) + 1) * tf, N.SESSION_MIN)) * 60 - (ck.minuteOfDay * 60 + ck.sec));
     else if (tf === 'D') cd = fmtRemain(N.SESSION_MIN * 60 - (ck.minuteOfDay * 60 + ck.sec));
-    chart.setData({ candles: f.view, overlays, lines, zones, sub, maxEndFloat: f.maxEndFloat, tf, style: c.style, countdown: cd, symbol: M.ticker, tfLabel: N.tfLabel(tf) });
+    chart.setData({ shapes, hud, vol: { on: !naked && c.ind.vol, pct: c.pk2.vb ? 0.25 : c.volPct, hawk: !naked && c.pk2.vb ? hawkD : null, showMa: c.pk2.vbMa, alpha: c.pk2.vb ? 0.55 : 0.5 }, candles: f.view, overlays, lines, zones, sub, maxEndFloat: f.maxEndFloat, tf, style: c.style, countdown: cd, symbol: M.ticker, tfLabel: N.tfLabel(tf) });
     chart.render();
     // header
     el('px').textContent = '₹' + price.toFixed(2);
@@ -305,6 +377,7 @@
       else if (l.kind === 'user') { const u = S.userLines.find(x => x.id === l.id); if (u) u.price = price; }
       N.sfx.drop(); refresh(); renderPanels(true);
     },
+    onAnchor: t => { C().anchorT = t; C().pk2.av = true; N.saveCfg(); setTool('cursor'); N.sfx.drop(); N.toast('Anchored VWAP set at ' + N.fmtFull(t, C().tf), 'info'); refreshHeader(); refresh(); },
     onHline: price => { S.userLines.push({ id: 'u' + (S.uid++), price: snap(price) }); setTool('cursor'); N.sfx.drop(); refresh(); },
     onLineDelete: l => { S.userLines = S.userLines.filter(u => u.id !== l.id); N.sfx.click(); refresh(); }
   };
@@ -322,7 +395,7 @@
     if (S.playing) S.raf = requestAnimationFrame(loop);
   }
   function play() { if (S.playing) return; N.sfx.unlock(); S.playing = true; S.lastReal = performance.now(); S.raf = requestAnimationFrame(loop); N.setIcon($('rpPlayIc'), 'pause'); renderPanels(true); }
-  function pause() { S.playing = false; cancelAnimationFrame(S.raf); N.setIcon($('rpPlayIc'), 'play'); renderPanels(true); }
+  function pause() { S.playing = false; if (S.pk) S.pk.fkey = '';  cancelAnimationFrame(S.raf); N.setIcon($('rpPlayIc'), 'play'); renderPanels(true); }
   const toggle = () => S.playing ? pause() : play();
   function boundary(skip) {
     const ck = M.clock(S.sec), m = ck.minuteOfDay, tf = C().tf; let mins;
@@ -388,14 +461,32 @@
     const k = e.key.toLowerCase();
     if (k === 'b') openPos(1); else if (k === 's') openPos(-1); else if (k === 'c') closeMarket('MANUAL'); else if (k === 'v') reversePos();
     else if (k === ' ') { e.preventDefault(); toggle(); } else if (k === 'r') restart(); else if (k === 'n') newChart(); else if (k === 'h') toggleNaked(); else if (k === 't') $('btnTheme').click();
-    else if (k === 'm') setTool(S.tool === 'measure' ? 'cursor' : 'measure'); else if (k === 'l') setTool(S.tool === 'hline' ? 'cursor' : 'hline'); else if (k === 'escape') { setTool('cursor'); chart.measure = null; chart.render(); N.closeMenu(); }
+    else if (k === 'm') setTool(S.tool === 'measure' ? 'cursor' : 'measure'); else if (k === 'l') setTool(S.tool === 'hline' ? 'cursor' : 'hline'); else if (k === 'escape') { setTool('cursor'); chart.measure = null; chart.sticky = null; chart.render(); N.closeMenu(); }
     else if (k === 'e') $('chBE').click(); else if (k === 'arrowright') { e.preventDefault(); step(e.shiftKey); }
     else if (k === '[' || k === ']') { const i = SPEEDS.findIndex(s => s[0] === S.speed); const j = N.clamp(i + (k === ']' ? 1 : -1), 0, SPEEDS.length - 1); setSpeed(SPEEDS[j][0]); }
     else if (k >= '1' && k <= '9') { const tf = N.TF_ORDER[parseInt(k, 10) - 1]; if (tf !== undefined) setTf(tf); }
   });
 
+
+  /* ======================= footer: range, scale, clock ======================= */
+  function setRange(key) {
+    const tf = C().tf, per = { '1D': 1, '5D': 5, '1M': 22, '3M': 66, '6M': 130 }[key];
+    chart.followLatest = true; chart.hooks.onFollow(true); chart.autoY = true; chart.manualLo = chart.manualHi = null; chart.sticky = null;
+    const n = chart.d.candles.length; let bars;
+    if (key === 'All') bars = n; else if (typeof tf === 'number') bars = per * N.SESSION_MIN / tf; else if (tf === 'D') bars = per; else if (tf === 'W') bars = per / 5; else bars = per / 22;
+    chart.viewCount = N.clamp(Math.round(bars), 12, Math.max(12, n)); chart.render(); N.sfx.click();
+    document.querySelectorAll('#stRanges button').forEach(b => b.classList.toggle('on', b.dataset.r === key)); setTimeout(() => document.querySelectorAll('#stRanges button').forEach(b => b.classList.remove('on')), 900);
+  }
+  document.querySelectorAll('#stRanges button').forEach(b => b.onclick = () => setRange(b.dataset.r));
+  document.querySelectorAll('#stScale button').forEach(b => b.onclick = () => {
+    const m = b.dataset.s; const cur = chart.scaleMode; const nx = (m === 'auto') ? 'auto' : (cur === m ? 'auto' : m);
+    if (m === 'auto') { chart.resetPrice(); } chart.setScale(nx);
+    document.querySelectorAll('#stScale button').forEach(x => x.classList.toggle('on', x.dataset.s === nx && nx !== 'auto')); N.sfx.click();
+  });
+
   /* ======================= boot ======================= */
   function boot() {
+    if (C().sub === 'volume') { C().sub = 'none'; C().ind.vol = true; N.saveCfg(); }
     N.hydrate(); applyTheme(); N.statsInit(); N.rcInit(); N.settingsInit();
     document.documentElement.style.setProperty('--panel-width', C().panelW + 'px');
     if (!C().side && !mobile()) { $('side').classList.add('collapsed'); $('resizer').classList.add('collapsed'); }

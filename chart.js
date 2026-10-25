@@ -13,7 +13,7 @@
       this.colors = { bg: '#0f131c', grid: '#1f2433', axis: '#2a2e39', text: '#d1d4dc', dim: '#7d8695', up: '#26a69a', down: '#ef5350', cross: '#9aa1b2', tag: '#1b2030', accent: '#2962ff' };
       this.viewCount = 100; this.followLatest = true; this.viewEndFloat = 0;
       this.autoY = true; this.manualLo = null; this.manualHi = null;
-      this.hoverX = null; this.hoverY = null; this.tool = 'cursor'; this.measure = null;
+      this.hoverX = null; this.hoverY = null; this.tool = 'cursor'; this.measure = null; this.sticky = null; this.scaleMode = 'auto'; this.futT = [];
       this.pad = { top: 8, right: 66, bottom: 24, left: 4 };
       this.hooks = {}; this._pills = []; this.draggingLine = null; this.hoverLine = null; this.dragPrice = null;
       this._raf = 0;
@@ -32,8 +32,16 @@
       this.canvas.width = Math.round(this.W * dpr); this.canvas.height = Math.round(this.H * dpr);
       this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); this.render();
     }
-    priceAtY(y) { if (this.lo == null) return null; return this.lo + (1 - (y - this.pad.top) / this.plotH) * (this.hi - this.lo); }
-    yAt(p) { return this.pad.top + (1 - (p - this.lo) / (this.hi - this.lo)) * this.plotH; }
+    priceAtY(y) { if (this.lo == null) return null; const f = 1 - (y - this.pad.top) / this.plotH; if (this.scaleMode === 'log') { const a = Math.log(this.lo), b = Math.log(this.hi); return Math.exp(a + f * (b - a)); } return this.lo + f * (this.hi - this.lo); }
+    yAt(p) { if (this.scaleMode === 'log') { const a = Math.log(this.lo), b = Math.log(this.hi); return this.pad.top + (1 - (Math.log(Math.max(p, 1e-6)) - a) / (b - a)) * this.plotH; } return this.pad.top + (1 - (p - this.lo) / (this.hi - this.lo)) * this.plotH; }
+    setScale(m) { this.scaleMode = m; this.autoY = true; this.manualLo = this.manualHi = null; this.render(); }
+    timeAt(gi) { // time of candle index gi, extrapolated into the empty space on the right
+      const cs = this.d.candles, n = cs.length; if (!n) return 0; if (gi < n) return cs[Math.max(0, gi)].time;
+      const need = gi - n + 1, f = this.futT; if (f.key !== n + ':' + this.d.tf + ':' + cs[n - 1].time) { f.length = 0; f.key = n + ':' + this.d.tf + ':' + cs[n - 1].time; }
+      while (f.length < need) f.push(N.nextBarTime(f.length ? f[f.length - 1] : cs[n - 1].time, this.d.tf));
+      return f[need - 1];
+    }
+    clearSticky() { if (this.sticky) { this.sticky = null; this.render(); } }
     idxAtX(x) { return (x - this.pad.left) / this.slot + (this.endFloat - this.count) - 0.5; }
     xAtIdx(i) { return this.pad.left + (i - (this.endFloat - this.count)) * this.slot + this.slot / 2; }
 
@@ -47,7 +55,7 @@
 
     _bind() {
       const cv = this.canvas, ptrs = new Map();
-      let mode = null, sx = 0, sy = 0, sEnd = 0, bLo = 0, bHi = 1, ppp = 1, bCount = 100, bSlot = 10, pinchD = 0, pinchC = 100, movedY = false;
+      let pressT = 0, tapOK = false, mode = null, sx = 0, sy = 0, sEnd = 0, bLo = 0, bHi = 1, ppp = 1, bCount = 100, bSlot = 10, pinchD = 0, pinchC = 100, movedY = false;
       cv.addEventListener('wheel', e => {
         e.preventDefault();
         if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 2) { this._panBars(e.deltaX / this.slot); return; }
@@ -58,7 +66,9 @@
         else this.viewCount = nc;
         this.render();
       }, { passive: false });
+      cv.addEventListener('pointerdown', e => { this._pt = e.pointerType; }, true); cv.addEventListener('pointermove', e => { this._pt = e.pointerType; }, true);
       cv.addEventListener('mousemove', e => {
+        if (this._pt === 'touch') return;
         const r = cv.getBoundingClientRect(); this.hoverX = e.clientX - r.left; this.hoverY = e.clientY - r.top;
         if (!mode) {
           const h = this._hitLine(this.hoverX, this.hoverY, false); this.hoverLine = h;
@@ -72,16 +82,17 @@
         cv.setPointerCapture(e.pointerId);
         const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, touch = e.pointerType === 'touch';
         ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-        if (touch) { this.hoverX = x; this.hoverY = y; }
         if (ptrs.size === 1) {
           const del = this._hitDelete(x, y); if (del) { mode = 'none'; this.hooks.onLineDelete && this.hooks.onLineDelete(del); return; }
           const inPlot = x >= this.pad.left && x <= this.W - this.pad.right && y >= this.pad.top && y <= this.pad.top + this.plotH;
           const hit = this._hitLine(x, y, touch);
           if (hit) { mode = 'dragline'; this.draggingLine = hit; this.dragPrice = hit.price; cv.style.cursor = 'ns-resize'; this.hooks.onLineGrab && this.hooks.onLineGrab(hit); this.render(); return; }
+          if (this.tool === 'anchor' && inPlot) { mode = 'none'; this.hooks.onAnchor && this.hooks.onAnchor(this.timeAt(Math.max(0, Math.round(this.idxAtX(x))))); return; }
           if (this.tool === 'hline' && inPlot) { mode = 'none'; this.hooks.onHline && this.hooks.onHline(this.priceAtY(y)); return; }
           if (this.tool === 'measure' && inPlot) { mode = 'measure'; const a = { i: this.idxAtX(x), p: this.priceAtY(y) }; this.measure = { a, b: a, done: false }; this.render(); return; }
           mode = x > this.W - this.pad.right ? 'price' : (y > this.H - this.pad.bottom ? 'time' : 'pan');
-          sx = e.clientX; sy = e.clientY; movedY = false;
+          sx = e.clientX; sy = e.clientY; movedY = false; clearTimeout(pressT); tapOK = touch && mode === 'pan' && inPlot && this.tool === 'cursor';
+          if (tapOK && N.cfg.showCrosshair) pressT = setTimeout(() => { if (mode === 'pan' && tapOK) { mode = 'cross'; tapOK = false; this.sticky = { x, y }; if (navigator.vibrate && N.cfg.haptics) { try { navigator.vibrate(12); } catch (er) { } } this.render(); } }, 300);
           sEnd = this.followLatest ? this.d.maxEndFloat + this.viewCount * N.cfg.rightBars : this.viewEndFloat;
           bLo = this.lo != null ? this.lo : 0; bHi = this.hi != null ? this.hi : 1; ppp = this.plotH / (bHi - bLo || 1); bCount = this.viewCount; bSlot = this.slot || 10;
         } else if (ptrs.size === 2) {
@@ -98,7 +109,8 @@
         }
         if (ptrs.size !== 1) return;
         const dx = e.clientX - sx, dy = e.clientY - sy;
-        if (e.pointerType === 'touch') { this.hoverX = x; this.hoverY = y; }
+        if (mode === 'cross') { this.sticky = { x: clamp(x, this.pad.left, this.W - this.pad.right), y: clamp(y, this.pad.top, this.pad.top + this.plotH) }; this.requestRender(); return; }
+        if (tapOK && Math.hypot(dx, dy) > 8) { tapOK = false; clearTimeout(pressT); }
         if (mode === 'dragline') { const p = this.priceAtY(y); this.dragPrice = p; this.hooks.onLineDrag && this.hooks.onLineDrag(this.draggingLine, p); this.render(); return; }
         if (mode === 'measure') { this.measure.b = { i: this.idxAtX(x), p: this.priceAtY(y) }; this.render(); return; }
         if (mode === 'pan') {
@@ -118,10 +130,13 @@
           this.hooks.onLineDrop && this.hooks.onLineDrop(l, p); cv.style.cursor = 'crosshair';
         }
         if (mode === 'measure' && this.measure) { this.measure.done = true; }
-        ptrs.delete(e.pointerId); if (ptrs.size < 2) pinchD = 0; if (ptrs.size === 0) { mode = null; if (e.pointerType === 'touch') { this.hoverX = null; this.render(); } }
+        clearTimeout(pressT);
+        if (tapOK && mode === 'pan' && e.type === 'pointerup' && N.cfg.showCrosshair) { const r = cv.getBoundingClientRect(); this.sticky = this.sticky ? null : { x: e.clientX - r.left, y: e.clientY - r.top }; this.render(); }
+        tapOK = false;
+        ptrs.delete(e.pointerId); if (ptrs.size < 2) pinchD = 0; if (ptrs.size === 0) { mode = null; }
       };
       cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
-      cv.addEventListener('dblclick', () => this.resetView());
+      cv.addEventListener('dblclick', () => { this.sticky = null; this.resetView(); });
       cv.addEventListener('contextmenu', e => e.preventDefault());
     }
     _panBars(db) { this.followLatest = false; this.hooks.onFollow && this.hooks.onFollow(false); this.viewEndFloat = clamp((this.followLatest ? this.d.maxEndFloat : this.viewEndFloat) + db, 8, this.d.maxEndFloat + this.viewCount * 0.9); this.render(); }
@@ -162,13 +177,18 @@
       if (this.autoY || this.manualLo == null) {
         lo = Infinity; hi = -Infinity;
         for (const b of vis) { if (b.low < lo) lo = b.low; if (b.high > hi) hi = b.high; }
-        for (const o of d.overlays) { const v = o.vals; for (let k = v.length - 1; k >= 0 && v[k].time >= firstT; k--) { if (v[k].time > lastT) continue; if (v[k].value < lo) lo = v[k].value; if (v[k].value > hi) hi = v[k].value; } }
+        for (const o of d.overlays) { if (o.hide) continue; const v = o.vals; for (let k = v.length - 1; k >= 0 && v[k].time >= firstT; k--) { if (v[k].time > lastT) continue; if (v[k].value < lo) lo = v[k].value; if (v[k].value > hi) hi = v[k].value; } }
         for (const l of d.lines) if (l.autoscale) { if (l.price < lo) lo = l.price; if (l.price > hi) hi = l.price; }
         if (!isFinite(lo) || lo === hi) { lo = (lo || 0) - 1; hi = (hi || 1) + 1; }
         const rg = hi - lo; lo -= rg * 0.07; hi += rg * 0.09;
       } else { lo = this.manualLo; hi = this.manualHi; }
       this.lo = lo; this.hi = hi;
-      const Y = p => pad.top + (1 - (p - lo) / (hi - lo)) * plotH;
+      if (this.scaleMode === 'log') { lo = Math.max(lo, 0.01); if (hi <= lo) hi = lo * 1.01; this.lo = lo; this.hi = hi; }
+      const lgA = Math.log(lo), lgB = Math.log(hi), isLog = this.scaleMode === 'log', isPct = this.scaleMode === 'pct', pbase = vis.length ? vis[0].close : 1;
+      const Y = isLog ? (p => pad.top + (1 - (Math.log(Math.max(p, 1e-6)) - lgA) / (lgB - lgA)) * plotH) : (p => pad.top + (1 - (p - lo) / (hi - lo)) * plotH);
+      const axTxt = p => isPct ? ((p / pbase - 1) * 100).toFixed(2) + '%' : p.toFixed(step < 1 ? 2 : (step < 10 ? 1 : 0));
+      // ---- time-axis labels (TradingView style: day number / month in bold, clock times at round steps) ----
+      const tl = this._timeLabels(ctx, cs, n, startIdx, endFloat, count, slot, X, d.tf, font(fs, '500'), font(fs, '700'), pad, W);
 
       // session breaks
       if (cf.showSessionBreaks && N.isIntraday(d.tf)) {
@@ -180,7 +200,7 @@
         ctx.stroke(); ctx.setLineDash([]);
       }
       // zones
-      for (const z of d.zones) { const a = Y(z.from), b = Y(z.to); ctx.fillStyle = z.color; ctx.fillRect(pad.left, Math.min(a, b), plotW, Math.max(1, Math.abs(b - a))); }
+      for (const z of d.zones) { const a = Y(z.from), b = Y(z.to), zx = z.fromIdx != null ? clamp(X(z.fromIdx) - slot / 2, pad.left, W - pad.right) : pad.left; ctx.fillStyle = z.color; ctx.fillRect(zx, Math.min(a, b), W - pad.right - zx, Math.max(1, Math.abs(b - a))); }
 
       // grid + price axis
       const step = niceStep((hi - lo) / Math.max(3, plotH / 58));
@@ -192,25 +212,26 @@
         for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) { const y = Math.round(Y(p)) + .5; ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); }
         ctx.stroke();
       }
-      const everyN = Math.max(1, Math.ceil(84 / slot));
       if (gm === 'both' || gm === 'v') {
         ctx.strokeStyle = c.grid; ctx.lineWidth = 1; ctx.beginPath();
-        for (let i = 0; i < vis.length; i++) { const gi = startIdx + i; if (gi % everyN !== 0) continue; const x = Math.round(X(gi)) + .5; ctx.moveTo(x, pad.top); ctx.lineTo(x, subTop + subH); }
+        for (const L of tl) { const x = Math.round(L.x) + .5; ctx.moveTo(x, pad.top); ctx.lineTo(x, subTop + subH); }
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
       ctx.fillStyle = c.dim; ctx.textAlign = 'left';
-      for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) { const y = Y(p); if (y > pad.top + 6 && y < pad.top + plotH - 6) ctx.fillText(p.toFixed(step < 1 ? 2 : (step < 10 ? 1 : 0)), W - pad.right + 7, y); }
+      for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) { const y = Y(p); if (y > pad.top + 6 && y < pad.top + plotH - 6) ctx.fillText(axTxt(p), W - pad.right + 7, y); }
       // axis line
       ctx.strokeStyle = c.axis; ctx.beginPath(); ctx.moveTo(W - pad.right + .5, pad.top); ctx.lineTo(W - pad.right + .5, subTop + subH); ctx.moveTo(pad.left, H - pad.bottom + .5); ctx.lineTo(W - pad.right, H - pad.bottom + .5); ctx.stroke();
       // time labels
-      ctx.fillStyle = c.dim; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      for (let i = 0; i < vis.length; i++) { const gi = startIdx + i; if (gi % everyN !== 0) continue; const x = X(gi); if (x > pad.left + 16 && x < W - pad.right - 16) ctx.fillText(N.fmtAxis(vis[i].time, d.tf), x, H - pad.bottom + 6); }
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      for (const L of tl) { ctx.font = L.bold ? font(fs, '700') : font(fs, '500'); ctx.fillStyle = L.bold ? c.text : c.dim; ctx.fillText(L.txt, L.x, H - pad.bottom + 6); }
 
       // candles
       const bw = Math.max(1, slot * cf.bodyRatio), style = d.style || 'candle';
       const upC = cf.upColor, dnC = cf.downColor, hollow = style === 'hollow' || cf.hollowUp;
       ctx.save(); ctx.beginPath(); ctx.rect(pad.left, pad.top, plotW, plotH); ctx.clip();
+      if (d.vol && d.vol.on) this._drawVolOverlay(ctx, d.vol, vis, startIdx, X, bw, pad.top + plotH, plotH, c);
+      for (const z of (d.shapes || [])) if (z.t === 'box') this._shapeBox(ctx, z, X, Y, slot, startIdx, endFloat, count, W, font, fs);
       if (style === 'line' || style === 'area') {
         ctx.beginPath(); let first = true, fx = 0, lx = 0;
         for (let i = 0; i < vis.length; i++) { const x = X(startIdx + i), y = Y(vis[i].close); if (first) { ctx.moveTo(x, y); fx = x; first = false; } else ctx.lineTo(x, y); lx = x; }
@@ -241,17 +262,20 @@
       ctx.lineJoin = 'round';
       for (const o of d.overlays) {
         const v = o.vals; if (!v.length) continue;
-        ctx.strokeStyle = o.color; ctx.lineWidth = cf.indWidth; ctx.beginPath(); let st = false;
+        ctx.strokeStyle = o.color; ctx.fillStyle = o.color; ctx.lineWidth = o.width || cf.indWidth; ctx.setLineDash(o.dash || []); ctx.beginPath(); let st = false;
         // find first visible by binary search on time
         let a = 0, b2 = v.length - 1; while (a < b2) { const m = (a + b2) >> 1; if (v[m].time < firstT) a = m + 1; else b2 = m; }
         for (let k = Math.max(0, a - 1); k < v.length; k++) {
           if (v[k].time > lastT) break;
           const gi = this._timeIdx(v[k].time, startIdx, vis); if (gi < 0) continue; const x = X(gi), y = Y(v[k].value);
           const brk = k > 0 && o.breakOnSession && o.session && o.session(v[k].time) !== o.session(v[k - 1].time);
+          if (o.dots) { ctx.moveTo(x + 1.6, y); ctx.arc(x, y, 1.6, 0, 7); continue; }
           if (!st || brk) { ctx.moveTo(x, y); st = true; } else ctx.lineTo(x, y);
         }
-        ctx.stroke();
+        if (o.dots) ctx.fill(); else ctx.stroke(); ctx.setLineDash([]);
       }
+      // indicator-pack shapes (zig-zag, S/R lines, markers)
+      for (const z of (d.shapes || [])) { if (z.t === 'seg') this._shapeSeg(ctx, z, X, Y, startIdx, vis.length); else if (z.t === 'hline') this._shapeHline(ctx, z, X, Y, slot, W, font, fs); else if (z.t === 'mark') this._shapeMark(ctx, z, X, Y, cs, startIdx, vis.length, font, fs); }
       // lines
       ctx.lineJoin = 'miter'; const usedL = [];
       for (const l of d.lines) {
@@ -259,8 +283,10 @@
         if (y < pad.top - 2 || y > pad.top + plotH + 2) continue;
         const hot = this._isDrag(l) || (this.hoverLine && l.id !== undefined && this.hoverLine.id === l.id);
         ctx.strokeStyle = l.color; ctx.lineWidth = (l.width || cf.levelWidth) + (hot ? 0.8 : 0); ctx.setLineDash(l.dashed ? [6, 4] : []);
-        ctx.globalAlpha = l.alpha || 1; ctx.beginPath(); ctx.moveTo(pad.left, Math.round(y) + .5); ctx.lineTo(W - pad.right, Math.round(y) + .5); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
-        if (cf.levelLabels && l.label && !l.pill) { ctx.fillStyle = l.color; ctx.font = font(fs - 1, '600'); ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; let ly = y - 3; while (usedL.some(u => Math.abs(u - ly) < fs + 1)) ly -= fs + 1; usedL.push(ly); ctx.fillText(l.label, pad.left + 6, ly); }
+        const lx0 = l.fromIdx != null ? clamp(X(l.fromIdx) - slot / 2, pad.left, W - pad.right) : pad.left;
+        if (lx0 >= W - pad.right - 2) continue;
+        ctx.globalAlpha = l.alpha || 1; ctx.beginPath(); ctx.moveTo(lx0, Math.round(y) + .5); ctx.lineTo(W - pad.right, Math.round(y) + .5); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+        if (cf.levelLabels && l.label && !l.pill) { ctx.fillStyle = l.color; ctx.font = font(fs - 1, '600'); ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; let ly = y - 3; while (usedL.some(u => Math.abs(u - ly) < fs + 1)) ly -= fs + 1; usedL.push(ly); ctx.fillText(l.label, lx0 + 6, ly); }
       }
       ctx.restore();
 
@@ -303,17 +329,27 @@
       // measure
       if (this.measure) this._drawMeasure(ctx, X, Y, c, font, fs);
 
-      // crosshair
+      // crosshair (mouse hover, or sticky on touch: tap / long-press)
       let hb = last, hIdx = vis.length - 1;
-      if (cf.showCrosshair && this.hoverX != null && this.hoverX >= pad.left && this.hoverX <= W - pad.right && this.hoverY <= H - pad.bottom && vis.length) {
-        let gi = Math.round(this.idxAtX(this.hoverX)); gi = clamp(gi, startIdx, startIdx + vis.length - 1); hIdx = gi - startIdx; hb = vis[hIdx];
-        const x = Math.round(X(gi)) + .5, hy = clamp(this.hoverY, pad.top, subTop + subH);
-        ctx.strokeStyle = c.cross; ctx.lineWidth = 1; ctx.setLineDash(cf.crosshairStyle === 'solid' ? [] : cf.crosshairStyle === 'dotted' ? [1, 3] : [4, 4]); ctx.globalAlpha = .8;
+      const cx0 = this.sticky ? this.sticky.x : this.hoverX, cy0 = this.sticky ? this.sticky.y : this.hoverY;
+      if (cf.showCrosshair && cx0 != null && cx0 >= pad.left && cx0 <= W - pad.right && cy0 <= H - pad.bottom && vis.length) {
+        const rawI = Math.round(this.idxAtX(cx0)), gi = Math.max(startIdx, rawI); hIdx = clamp(gi, startIdx, startIdx + vis.length - 1) - startIdx; hb = vis[hIdx];
+        const x = Math.round(X(gi)) + .5, hy = clamp(cy0, pad.top, subTop + subH);
+        ctx.strokeStyle = c.cross; ctx.lineWidth = 1; ctx.setLineDash(cf.crosshairStyle === 'solid' ? [] : cf.crosshairStyle === 'dotted' ? [1, 3] : [4, 4]); ctx.globalAlpha = .85;
         ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, subTop + subH); ctx.moveTo(pad.left, Math.round(hy) + .5); ctx.lineTo(W - pad.right, Math.round(hy) + .5); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
-        if (hy <= pad.top + plotH) { const pr = this.priceAtY(hy); ctx.fillStyle = c.tag; ctx.fillRect(W - pad.right, hy - 9, pad.right - 1, 18); ctx.strokeStyle = c.axis; ctx.strokeRect(W - pad.right + .5, hy - 8.5, pad.right - 2, 17); ctx.fillStyle = c.text; ctx.font = font(fs, '600'); ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(pr.toFixed(2), W - pad.right + 6, hy + .5); }
-        const tl = N.fmtFull(hb.time, d.tf); ctx.font = font(fs, '600'); const tw = ctx.measureText(tl).width + 14;
+        if (this.sticky) { ctx.fillStyle = c.cross; ctx.beginPath(); ctx.arc(x, hy, 3, 0, 7); ctx.fill(); }
+        if (hy <= pad.top + plotH) { const pr = this.priceAtY(hy), pt = isPct ? ((pr / pbase - 1) * 100).toFixed(2) + '%' : pr.toFixed(2); ctx.fillStyle = c.tag; ctx.fillRect(W - pad.right, hy - 9, pad.right - 1, 18); ctx.strokeStyle = c.axis; ctx.strokeRect(W - pad.right + .5, hy - 8.5, pad.right - 2, 17); ctx.fillStyle = c.text; ctx.font = font(fs, '600'); ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(pt, W - pad.right + 6, hy + .5); }
+        const tlb = N.fmtFull(this.timeAt(gi), d.tf); ctx.font = font(fs, '600'); const tw = ctx.measureText(tlb).width + 14;
         const tx = clamp(x - tw / 2, pad.left, W - pad.right - tw); ctx.fillStyle = c.tag; ctx.fillRect(tx, H - pad.bottom + 1, tw, 18); ctx.strokeStyle = c.axis; ctx.strokeRect(tx + .5, H - pad.bottom + 1.5, tw - 1, 17);
-        ctx.fillStyle = c.text; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(tl, tx + tw / 2, H - pad.bottom + 10.5);
+        ctx.fillStyle = c.text; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(tlb, tx + tw / 2, H - pad.bottom + 10.5);
+      }
+
+      // HUD table (ADX dashboard)
+      if (d.hud && d.hud.rows && d.hud.rows.length) {
+        ctx.font = font(fs - 0.5, '600'); const rows = d.hud.rows, rw = 118, rh = 17, hx = W - pad.right - rw - 8, hy0 = pad.top + 44;
+        ctx.globalAlpha = .92; ctx.fillStyle = c.tag; rrect(ctx, hx, hy0, rw, rows.length * rh + 22, 6); ctx.fill(); ctx.strokeStyle = c.axis; ctx.stroke(); ctx.globalAlpha = 1;
+        ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillStyle = c.dim; ctx.fillText(d.hud.title, hx + 8, hy0 + 11);
+        rows.forEach((r, k) => { const yy = hy0 + 22 + k * rh + rh / 2; ctx.fillStyle = c.dim; ctx.textAlign = 'left'; ctx.fillText(r[0], hx + 8, yy); ctx.fillStyle = r[2] || c.text; ctx.textAlign = 'right'; ctx.fillText(r[1], hx + rw - 8, yy); });
       }
 
       // legend
@@ -329,8 +365,73 @@
         ctx.fillStyle = c.dim; ctx.fillText('Vol ' + Math.round(bb.volume || 0).toLocaleString('en-IN'), x, y0);
         y0 += 17; ctx.font = font(fs - 0.5, '600');
         let xx = x0;
-        for (const o of d.overlays) { const v = valAt(o.vals, hb.time); if (v == null) continue; const t = o.label + ' ' + v.toFixed(2); ctx.fillStyle = o.color; ctx.fillText(t, xx, y0); xx += ctx.measureText(t).width + 14; }
+        for (const o of d.overlays) { if (!o.label) continue; const v = valAt(o.vals, hb.time); if (v == null) continue; const t = o.label + ' ' + v.toFixed(2); ctx.fillStyle = o.color; ctx.fillText(t, xx, y0); xx += ctx.measureText(t).width + 14; }
       }
+    }
+
+    _timeLabels(ctx, cs, n, startIdx, endFloat, count, slot, X, tf, fNorm, fBold, pad, W) {
+      const out = [], lo = Math.max(0, Math.floor(endFloat - count) - 1), hi = Math.ceil(endFloat) + 1, minX = pad.left + 14, maxX = W - pad.right - 14;
+      const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const items = []; let prev = lo > 0 ? this.timeAt(lo - 1) : null;
+      for (let gi = lo; gi <= hi; gi++) { const t = this.timeAt(gi); items.push({ gi, t, p: N.istParts(t), pp: prev !== null ? N.istParts(prev) : null, prevT: prev }); prev = t; }
+      ctx.font = fBold; const placed = [];
+      const tryPlace = (it, txt, bold, gap) => {
+        const x = X(it.gi); if (x < minX || x > maxX) return;
+        ctx.font = bold ? fBold : fNorm; const w = ctx.measureText(txt).width;
+        for (const q of placed) if (Math.abs(q.x - x) < (q.w + w) / 2 + gap) return;
+        placed.push({ x, w }); out.push({ x, txt, bold });
+      };
+      if (typeof tf === 'number') {
+        const mins = [1, 2, 3, 5, 10, 15, 30, 60, 120, 180, 240], pxPerMin = slot / tf; let S = 240; for (const m of mins) if (m * pxPerMin >= 62) { S = m; break; }
+        const dayStart = it => !it.pp || it.pp.day !== it.p.day || it.pp.mon !== it.p.mon;
+        items.forEach(it => { if (dayStart(it)) { const monChg = !it.pp || it.pp.mon !== it.p.mon; tryPlace(it, monChg && it.pp ? MON[it.p.mon] : String(it.p.day), true, 6); } });
+        items.forEach(it => { if (dayStart(it)) return; const w = it.p.h * 60 + it.p.m, pw = it.pp.h * 60 + it.pp.m; if (Math.floor(w / S) !== Math.floor(pw / S)) tryPlace(it, String(it.p.h).padStart(2, '0') + ':' + String(it.p.m).padStart(2, '0'), false, 10); });
+      } else {
+        const key = it => tf === 'M' ? it.p.yr : it.p.mon;
+        items.forEach(it => { if (it.pp && key(it) !== (tf === 'M' ? it.pp.yr : it.pp.mon)) tryPlace(it, tf === 'M' ? String(it.p.yr) : (it.p.mon === 0 ? String(it.p.yr) : MON[it.p.mon]), true, 6); });
+        items.forEach(it => { if (tf === 'M') { tryPlace(it, MON[it.p.mon], false, 10); } else tryPlace(it, String(it.p.day), false, 14); });
+      }
+      return out;
+    }
+    _drawVolOverlay(ctx, v, vis, startIdx, X, bw, base, plotH, c) {
+      const cf = N.cfg, h = plotH * (v.pct || 0.2); let mx = 1; vis.forEach(b => { if ((b.volume || 0) > mx) mx = b.volume; });
+      const hk = v.hawk, cols = { g: v.buy || cf.upColor, r: v.sell || cf.downColor, n: v.neutral || '#8a93a6', b: v.other || '#2962ff' };
+      ctx.globalAlpha = v.alpha || 0.5;
+      vis.forEach((b, i) => {
+        const gi = startIdx + i, x = X(gi), hh = Math.max(1, (b.volume / mx) * h * 0.96); let col = b.close >= b.open ? cf.upColor : cf.downColor;
+        if (hk && gi - hk.off >= 0 && hk.kinds[gi - hk.off]) col = cols[hk.kinds[gi - hk.off]];
+        ctx.fillStyle = col; ctx.fillRect(Math.round(x - bw / 2), base - hh, Math.max(1, Math.round(bw)), hh);
+      });
+      ctx.globalAlpha = 1;
+      if (hk && v.showMa) {
+        ctx.strokeStyle = v.maColor || '#ffeb3b'; ctx.lineWidth = 1; ctx.beginPath(); let st = false;
+        vis.forEach((b, i) => { const gi = startIdx + i, k = gi - hk.off; if (k < 0 || k >= hk.ma.length) return; const x = X(gi), y = base - Math.min(1, hk.ma[k] / mx) * h * 0.96; if (!st) { ctx.moveTo(x, y); st = true; } else ctx.lineTo(x, y); });
+        ctx.stroke();
+      }
+    }
+    _shapeBox(ctx, z, X, Y, slot, startIdx, endFloat, count, W, font, fs) {
+      const pad = this.pad, x0 = z.i0 < -1e8 ? pad.left : Math.max(pad.left, X(z.i0) - slot / 2), x1 = z.i1 == null ? W - pad.right : Math.min(W - pad.right, X(z.i1) + slot / 2);
+      if (x1 <= x0) return; const y0 = Y(z.top), y1 = Y(z.bot), t = Math.min(y0, y1), h = Math.max(1.5, Math.abs(y1 - y0));
+      ctx.fillStyle = z.fill; ctx.fillRect(x0, t, x1 - x0, h);
+      if (z.stroke && z.stroke !== 'transparent') { ctx.strokeStyle = z.stroke; ctx.lineWidth = 1; ctx.strokeRect(x0 + .5, t + .5, x1 - x0 - 1, Math.max(1, h - 1)); }
+      if (z.text) { ctx.fillStyle = z.stroke; ctx.font = font(fs - 1, '700'); ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(z.text, x0 + 6, t + h / 2); }
+    }
+    _shapeSeg(ctx, z, X, Y, startIdx, nVis) {
+      const xa = X(z.i0), xb = X(z.i1); if ((xa < this.pad.left && xb < this.pad.left) || (xa > this.W - this.pad.right && xb > this.W - this.pad.right)) return;
+      ctx.strokeStyle = z.c; ctx.lineWidth = z.w || 1; ctx.setLineDash(z.dash || []); ctx.beginPath(); ctx.moveTo(xa, Y(z.p0)); ctx.lineTo(xb, Y(z.p1)); ctx.stroke(); ctx.setLineDash([]);
+    }
+    _shapeHline(ctx, z, X, Y, slot, W, font, fs) {
+      const y = Y(z.p), x0 = z.i0 < -1e8 ? this.pad.left : Math.max(this.pad.left, X(z.i0) - slot / 2); if (x0 >= W - this.pad.right) return;
+      ctx.strokeStyle = z.c; ctx.lineWidth = z.w || 1; ctx.setLineDash(z.dash || []); ctx.beginPath(); ctx.moveTo(x0, Math.round(y) + .5); ctx.lineTo(W - this.pad.right, Math.round(y) + .5); ctx.stroke(); ctx.setLineDash([]);
+      if (z.text) { ctx.fillStyle = z.c; ctx.font = font(fs - 1, '600'); ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.fillText(z.text, x0 + 6, y - 2); }
+    }
+    _shapeMark(ctx, z, X, Y, cs, startIdx, nVis, font, fs) {
+      if (z.i < startIdx || z.i >= startIdx + nVis || !cs[z.i]) return; const b = cs[z.i], x = X(z.i), r = z.big ? 6 : 4.2, off = z.big ? 7 : 5;
+      ctx.fillStyle = z.c; ctx.beginPath();
+      if (z.dir > 0) { const y = Y(b.low) + off; ctx.moveTo(x, y); ctx.lineTo(x - r, y + r * 1.6); ctx.lineTo(x + r, y + r * 1.6); }
+      else { const y = Y(b.high) - off; ctx.moveTo(x, y); ctx.lineTo(x - r, y - r * 1.6); ctx.lineTo(x + r, y - r * 1.6); }
+      ctx.closePath(); ctx.fill();
+      if (z.text) { ctx.font = font(fs - 1.5, '700'); ctx.textAlign = 'center'; ctx.textBaseline = z.dir > 0 ? 'top' : 'bottom'; ctx.fillText(z.text, x, z.dir > 0 ? Y(b.low) + off + r * 1.6 + 2 : Y(b.high) - off - r * 1.6 - 2); }
     }
     _timeIdx(t, startIdx, vis) { // index in candles of the bar with time t (visible window only)
       let lo = 0, hi = vis.length - 1; if (!vis.length || t < vis[0].time || t > vis[hi].time) return -1;

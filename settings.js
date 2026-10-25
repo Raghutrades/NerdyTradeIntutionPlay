@@ -2,8 +2,19 @@
 (function (N) {
   'use strict';
   const $ = N.$;
-  const TABS = [['look', 'palette', 'Appearance'], ['chart', 'candles', 'Chart canvas'], ['replay', 'clock', 'Replay'], ['trade', 'trade', 'Trading'], ['sound', 'volume', 'Sound'], ['data', 'database', 'Data & app']];
+  const TABS = [['look', 'palette', 'Appearance'], ['chart', 'candles', 'Chart canvas'], ['replay', 'clock', 'Replay'], ['trade', 'trade', 'Trading'], ['sound', 'volume', 'Sound'], ['data', 'database', 'Data & app'], ['about', 'info', 'About']];
   let cur = 'look';
+  // ✏️ EDIT YOUR ABOUT PAGE HERE — plain text, no code knowledge needed
+  N.ABOUT = {
+    app: 'NerdyTradeIntuition', name: 'Raghu — The Quant Stoic', tagline: 'intraday Nifty options trader & trading-psychology author',
+    insta: '@NerdyIntruder', instaUrl: 'https://www.instagram.com/nerdyintruder/',
+    bio: [
+      'I trade Nifty and Bank Nifty options intraday, built around market structure, open-interest divergence and VWAP. I write books and notes for retail traders under the handle @NerdyIntruder — markets, psychology, uncertainty and risk management; never a get-rich shortcut.',
+      'This simulator is my personal training ground: random synthetic charts, a tick-by-tick replay, draggable stop / target and a private journal, so intuition is built by repetition — with zero real money at risk.'
+    ],
+    chips: ['Market structure', 'VWAP & AVWAP', 'Support / Resistance', 'Supply & Demand', 'Risk first', 'Stoic discipline'],
+    fine: 'Synthetic data for practice only — not market data, not investment advice. Everything you save stays in this browser.'
+  };
 
   const chg = (k, v) => { N.cfg[k] = v; N.saveCfg(); N.cfgChanged && N.cfgChanged(k); };
   function row(title, sub, ctl) { const r = document.createElement('div'); r.className = 'frow'; r.innerHTML = '<div class="ft"><span>' + N.esc(title) + '</span>' + (sub ? '<span class="fs">' + N.esc(sub) + '</span>' : '') + '</div>'; const c = document.createElement('div'); c.className = 'ctl'; [].concat(ctl).forEach(x => c.appendChild(x)); r.appendChild(c); return r; }
@@ -65,7 +76,7 @@
       add(tog('pauseOnExit', 'Pause when a stop / target hits', 'Handy for reviewing the exit candle'));
       add(sect('Execution realism'));
       add(sel('slipTicks', 'Slippage on market & stop fills', [[0, 'None'], [1, '1 tick (₹0.05)'], [2, '2 ticks'], [3, '3 ticks'], [5, '5 ticks']], 'Applied against you', parseFloat));
-      add(tog('emaReset', 'EMAs reset each session', 'Intraday timeframes only'));
+      add(tog('emaResetDay', 'EMAs restart every session', 'Off = continuous across days, like TradingView'));
     } else if (cur === 'trade') {
       add(sect('Costs & capital'));
       add(sel('segment', 'Charge segment', [['intraday', 'Equity intraday'], ['delivery', 'Delivery'], ['futures', 'Futures'], ['options', 'Options']], 'Charges are deducted from every logged trade'));
@@ -88,6 +99,14 @@
       add(tog('sfxBar', 'New candle tick', 'A very soft tick when a candle closes'));
       add(tog('sfxUi', 'Interface clicks'));
       add(tog('haptics', 'Vibration on phones'));
+    } else if (cur === 'about') {
+      const A = N.ABOUT, d = document.createElement('div'); d.className = 'about';
+      d.innerHTML = '<img class="logo" src="icon-192.png" onerror="this.src=\'icons/icon-192.png\'" alt=""><h2>' + N.esc(A.app) + '</h2><div class="by">by <b>' + N.esc(A.name) + '</b> · ' + N.esc(A.tagline) + '</div>' +
+        A.bio.map(t => '<p>' + N.esc(t) + '</p>').join('') +
+        '<a class="ig" href="' + N.esc(A.instaUrl) + '" target="_blank" rel="noopener">' + N.icon('insta', 18) + N.esc(A.insta) + ' on Instagram</a>' +
+        '<div class="chips2">' + A.chips.map(t => '<span>' + N.esc(t) + '</span>').join('') + '</div>' +
+        '<p class="fine">' + N.esc(A.fine) + '</p>';
+      add(d);
     } else if (cur === 'data') {
       add(sect('Your data lives only in this browser'));
       const note = document.createElement('div'); note.className = 'note'; note.textContent = 'Trades, journal notes and settings are stored in this browser\'s local storage on this device. Nothing is uploaded. Clearing site data erases them — keep a backup.'; add(note);

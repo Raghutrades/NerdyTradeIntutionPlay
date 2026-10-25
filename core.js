@@ -41,10 +41,12 @@ window.NTI = window.NTI || {};
     showLastLine: true, showCountdown: true, showLegend: true, showWatermark: true, showSessionBreaks: true, showCrosshair: true,
     rightBars: 0.25, indWidth: 1.8, levelWidth: 1.2, levelLabels: true, snapTicks: true,
     sound: true, volume: 0.6, sfxTrade: true, sfxExit: true, sfxBar: false, sfxUi: true, haptics: true,
-    speed: 1, pauseOnExit: false, tickDensity: 1, slipTicks: 0, emaReset: true,
+    speed: 1, pauseOnExit: false, tickDensity: 1, slipTicks: 0, emaResetDay: false, volPct: 0.2, anchorT: null,
     segment: 'intraday', capital: 100000, defQty: 10, defSlPct: 0.5, defTpPct: 1.0, trailPts: 0,
-    tf: 5, style: 'candle', sub: 'volume',
-    ind: { vwap: false, avwap: false, ema9: false, ema21: false },
+    tf: 5, style: 'candle', sub: 'none',
+    ind: { vwap: false, avwap: false, ema9: false, ema21: false, vol: true },
+    pk1: { on: false, zzMajor: true, zzMinor: false, sd: true, sr: true, cd: true, pHammer: true, pInv: true, pEngulf: true, pStars: true, pBig: false, labels: false, sdMult: 3, srWidth: 1, srStrength: 2, srLeft: true },
+    pk2: { ema: false, e13: true, e21: true, e50: true, e200: true, vwap: false, vWk: true, vMo: false, vPd: false, av: false, avDays: 5, b1: true, b2: true, b3: false, adx: false, vb: false, vbPreset: 'Strict', vbLines: true, vbMa: true, labels: false },
     lv: { pd: { hl: false, fib: false }, pw: { hl: false, fib: false }, pm: { hl: false, fib: false }, dayo: false, dayhl: false, orb: false },
     naked: false, plan: true, side: true, panelW: 360, tab: 'trade', favTfs: [1, 5, 15, 60, 'D']
   };
@@ -135,6 +137,9 @@ window.NTI = window.NTI || {};
     info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
     list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
     flag: '<path d="M4 22V4M4 4h13l-2 4 2 4H4"/>',
+    anchor: '<circle cx="12" cy="5" r="3"/><path d="M12 8v14M5 12H2a10 10 0 0 0 20 0h-3"/>',
+    insta: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".6" fill="currentColor"/>',
+    brain: '<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a3 3 0 0 0-3-1z"/><path d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/>',
     copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'
   };
   N.ICONS = I;
