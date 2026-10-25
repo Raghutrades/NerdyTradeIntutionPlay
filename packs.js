@@ -24,7 +24,7 @@
   }
 
   /* ---- ILM|SP zig-zag (state machine from the Pine script) ---- */
-  function zigzag(bars, len, off, cUp, cDn, w, dash, out) {
+  function zigzag(bars, len, off, sUp, sDn, out) {
     let dir = 0, cb = -1, cv = 0, last = null, tb = -1, tv = NaN; const n = bars.length, segs = [];
     for (let i = 2 * len; i < n; i++) {
       const c = i - len, ph = pivotAt(bars, c, len, true), pl = pivotAt(bars, c, len, false), h = bars[i].high, l = bars[i].low;
@@ -43,20 +43,21 @@
       }
       if (dir === 1) { if (h >= tv || isNaN(tv)) { tv = h; tb = i; } } else if (dir === -1) { if (l <= tv || isNaN(tv)) { tv = l; tb = i; } }
     }
-    segs.forEach(s => out.push({ t: 'seg', i0: off + s.i0, p0: s.p0, i1: off + s.i1, p1: s.p1, c: s.up ? cUp : cDn, w, dash }));
-    if (dir !== 0 && tb >= 0 && !isNaN(tv)) out.push({ t: 'seg', i0: off + cb, p0: cv, i1: off + tb, p1: tv, c: dir === 1 ? cUp : cDn, w, dash });
+    const dsh = x => N.dashOf(x.d);
+    segs.forEach(g => { const q = g.up ? sUp : sDn; out.push({ t: 'seg', i0: off + g.i0, p0: g.p0, i1: off + g.i1, p1: g.p1, c: q.c, w: q.w, dash: dsh(q) }); });
+    if (dir !== 0 && tb >= 0 && !isNaN(tv)) { const q = dir === 1 ? sUp : sDn; out.push({ t: 'seg', i0: off + cb, p0: cv, i1: off + tb, p1: tv, c: q.c, w: q.w, dash: dsh(q) }); }
     return segs;
   }
 
   /* ---- Supply & Demand (swing zones, ATR sized, removed when closed through) ---- */
-  function supplyDemand(bars, atr50, L, keep, mult, off) {
+  function supplyDemand(bars, atr50, L, keep, multSup, multDem, off) {
     const zones = []; const n = bars.length;
     for (let i = 2 * L; i < n; i++) {
       const c = i - L, a = atr50[i] || atr50[c]; if (!a) continue;
       // break check on every bar
       for (let z = zones.length - 1; z >= 0; z--) { const zz = zones[z]; if ((zz.sup && bars[i].close > zz.top) || (!zz.sup && bars[i].close < zz.bot)) zones.splice(z, 1); }
       const addZ = sup => {
-        const buf = a * mult / 10, top = sup ? bars[c].high : bars[c].low + buf, bot = sup ? bars[c].high - buf : bars[c].low, poi = (top + bot) / 2;
+        const buf = a * (sup ? multSup : multDem) / 10, top = sup ? bars[c].high : bars[c].low + buf, bot = sup ? bars[c].high - buf : bars[c].low, poi = (top + bot) / 2;
         for (const z of zones) if (Math.abs(poi - (z.top + z.bot) / 2) <= a * 2) return;
         zones.unshift({ sup, top, bot, i0: c }); if (zones.length > keep) zones.pop();
       };
@@ -109,41 +110,38 @@
   }
 
   /* ---- pack 1 entry ---- */
-  P.compute1 = function (all, o, up, dn) {
+  P.compute1 = function (all, o, st) {
     const WIN = 1600, s0 = Math.max(0, all.length - WIN), bars = all.slice(s0), off = s0, shapes = [], n = bars.length;
     if (n < 40) return shapes;
     const atr50 = atrArr(bars, 50), atr14 = atrArr(bars, 14), last = bars[n - 1].close;
-    if (o.zzMajor) zigzag(bars, 15, off, '#4caf50', '#f44336', 1.2, null, shapes);
-    if (o.zzMinor) zigzag(bars, 5, off, '#64b5f6', '#ffa726', 1, [2, 3], shapes);
+    if (o.zzMajor) zigzag(bars, 15, off, st('zzMajUp'), st('zzMajDn'), shapes);
+    if (o.zzMinor) zigzag(bars, 5, off, st('zzMinUp'), st('zzMinDn'), shapes);
     let levels = [];
     if (o.sd) {
-      const zs = supplyDemand(bars, atr50, 10, 20, o.sdMult, off);
-      zs.forEach(z => { shapes.push({ t: 'box', i0: z.i0, i1: null, top: z.top, bot: z.bot, fill: z.sup ? 'rgba(233,30,99,.22)' : 'rgba(33,86,243,.24)', stroke: z.sup ? 'rgba(233,30,99,.8)' : 'rgba(33,86,243,.85)', kind: 'sd', text: o.labels ? (z.sup ? 'SUPPLY' : 'DEMAND') : '' }); levels.push({ lo: z.bot, hi: z.top, sup: !z.sup }); });
+      const sS = st('supply'), sD = st('demand'), zs = supplyDemand(bars, atr50, 10, 20, sS.t, sD.t, off);
+      zs.forEach(z => { const q = z.sup ? sS : sD; shapes.push({ t: 'box', i0: z.i0, i1: null, top: z.top, bot: z.bot, fill: N.rgba(q.c, .24), stroke: N.rgba(q.c, .85), kind: 'sd', text: o.labels ? (z.sup ? 'SUPPLY' : 'DEMAND') : '' }); levels.push({ lo: z.bot, hi: z.top, sup: !z.sup }); });
     }
     if (o.sr || o.cd) {
       const win = Math.min(n, 300); let hh = -Infinity, ll = Infinity; for (let i = n - win; i < n; i++) { if (bars[i].high > hh) hh = bars[i].high; if (bars[i].low < ll) ll = bars[i].low; }
       const tol = Math.max((hh - ll) * (o.srWidth || 1) / 100, 1e-6), lv = clusterLevels(bars, win, 5, tol, o.srStrength || 2).map(L => Object.assign(L, { sup: L.p < last }));
       const ab = lv.filter(l => !l.sup).sort((a, b) => a.p - b.p).slice(0, 5), be = lv.filter(l => l.sup).sort((a, b) => b.p - a.p).slice(0, 5);
       const pick = ab.concat(be), srLv = [];
+      const sSup = st('srSup'), sRes = st('srRes'), aN = atr14[n - 1] || tol;
       pick.forEach(L => {
-        const pad = Math.max(tol * 0.3, (L.hi - L.lo) / 2);
-        if (o.sr) {
-          const col = L.sup ? '#009688' : '#ff5252';
-          shapes.push({ t: 'box', i0: o.srLeft ? -1e9 : off + L.i0, i1: null, top: L.p + pad, bot: L.p - pad, fill: L.sup ? 'rgba(0,150,136,.16)' : 'rgba(255,82,82,.16)', stroke: 'transparent', kind: 'sr' });
-          shapes.push({ t: 'hline', i0: o.srLeft ? -1e9 : off + L.i0, p: L.p, c: col, w: 1, dash: [3, 3], kind: 'sr', text: o.labels ? (L.sup ? 'S ' : 'R ') + L.p.toFixed(2) + ' ×' + L.n : '' });
-        }
-        srLv.push({ lo: L.p - pad, hi: L.p + pad, sup: L.sup });
+        const q = L.sup ? sSup : sRes, half = Math.max(aN * q.t / 20, (L.hi - L.lo) / 2, 0.025);
+        if (o.sr) shapes.push({ t: 'box', i0: o.srLeft ? -1e9 : off + L.i0, i1: null, top: L.p + half, bot: L.p - half, fill: N.rgba(q.c, .28), stroke: N.rgba(q.c, .9), kind: 'sr', text: o.labels ? (L.sup ? 'S ' : 'R ') + L.p.toFixed(2) + ' ×' + L.n : '' });
+        srLv.push({ lo: L.p - half, hi: L.p + half, sup: L.sup });
       });
       levels = levels.concat(srLv);
     }
     if (o.cd && levels.length) {
-      patterns(bars, atr14, levels, n - 350, { hammer: o.pHammer, inv: o.pInv, engulf: o.pEngulf, stars: o.pStars, big: o.pBig }).forEach(m => shapes.push({ t: 'mark', i: off + m.i, dir: m.dir, c: m.dir > 0 ? up : dn, text: o.labels ? m.text : '' }));
+      patterns(bars, atr14, levels, n - 350, { hammer: o.pHammer, inv: o.pInv, engulf: o.pEngulf, stars: o.pStars, big: o.pBig }).forEach(m => shapes.push({ t: 'mark', i: off + m.i, dir: m.dir, c: m.dir > 0 ? st('patBull').c : st('patBear').c, text: o.labels ? m.text : '' }));
     }
     return shapes;
   };
 
   /* ---- pack 2: HawkEye volume colours + breakout signals ---- */
-  P.compute2 = function (all, o, trendFn) {
+  P.compute2 = function (all, o, trendFn, st) {
     const WIN = 1600, s0 = Math.max(0, all.length - WIN), bars = all.slice(s0), off = s0, n = bars.length, shapes = [], res = { shapes, hawk: null };
     if (n < 30) return res;
     const atr = atrArr(bars, 14), HL = 200, DIV = 3.6;
@@ -173,15 +171,16 @@
       if (b.close > hi + BUF * a && clv >= CLV && (!htf || tr >= 0) && i - lastSig > 8) { sigs.push({ i, dir: 1, lvl: hi }); lastSig = i; }
       else if (b.close < lo - BUF * a && (1 - clv) >= CLV && (!htf || tr <= 0) && i - lastSig > 8) { sigs.push({ i, dir: -1, lvl: lo }); lastSig = i; }
     }
-    sigs.slice(-6).forEach(s => { shapes.push({ t: 'mark', i: off + s.i, dir: s.dir, c: s.dir > 0 ? '#00e676' : '#ff1744', text: o.labels ? (s.dir > 0 ? 'BO' : 'BD') : '', big: true }); });
-    sigs.slice(-2).forEach(s => shapes.push({ t: 'hline', i0: off + s.i, p: s.lvl, c: s.dir > 0 ? '#00e676' : '#ff1744', w: 2, dash: null, kind: 'bo', text: '' }));
+    sigs.slice(-6).forEach(s => { shapes.push({ t: 'mark', i: off + s.i, dir: s.dir, c: s.dir > 0 ? st('boUp').c : st('boDn').c, text: o.labels ? (s.dir > 0 ? 'BO' : 'BD') : '', big: true }); });
+    sigs.slice(-2).forEach(s => shapes.push({ t: 'hline', i0: off + s.i, p: s.lvl, c: s.dir > 0 ? st('boUp').c : st('boDn').c, w: (s.dir > 0 ? st('boUp') : st('boDn')).w, dash: null, kind: 'bo', text: '' }));
     // nearest major levels (>=3 touches, aged) above/below as dashed lines
     if (o.lines !== false) {
       const last = bars[n - 1].close, tol = (atr[n - 1] || 0) * 0.5; if (tol) {
         const lv = clusterLevels(bars, Math.min(n, 250), 5, tol * 2, 3).filter(L => n - 1 - L.i0 >= 120);
         const ab = lv.filter(l => l.p > last).sort((a, b) => a.p - b.p)[0], be = lv.filter(l => l.p < last).sort((a, b) => b.p - a.p)[0];
-        if (ab) shapes.push({ t: 'hline', i0: off + ab.i0, p: ab.p, c: 'rgba(239,83,80,.85)', w: 1, dash: [6, 4], kind: 'lv', text: '' });
-        if (be) shapes.push({ t: 'hline', i0: off + be.i0, p: be.p, c: 'rgba(38,166,154,.9)', w: 1, dash: [6, 4], kind: 'lv', text: '' });
+        const qR = st('lvRes'), qS = st('lvSup');
+        if (ab) shapes.push({ t: 'hline', i0: off + ab.i0, p: ab.p, c: qR.c, w: qR.w, dash: N.dashOf(qR.d), kind: 'lv', text: '' });
+        if (be) shapes.push({ t: 'hline', i0: off + be.i0, p: be.p, c: qS.c, w: qS.w, dash: N.dashOf(qS.d), kind: 'lv', text: '' });
       }
     }
     return res;

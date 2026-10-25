@@ -18,8 +18,13 @@
 <body>
 
 <div id="splash">
-  <div class="sp-bars"><i style="height:22px"></i><i style="height:38px"></i><i style="height:16px"></i><i style="height:46px"></i><i style="height:26px"></i><i style="height:34px"></i></div>
-  <div class="sp-t">Nerdy<span>Trade</span>Intuition</div>
+  <div class="sp-glow"></div>
+  <div class="sp-logo"><i class="ring r1"></i><i class="ring r2"></i>
+    <svg width="92" height="92" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#131722"/><g stroke-linecap="round"><path class="c1" d="M18 14v8M18 40v10" stroke="#ef5350" stroke-width="3"/><rect class="c1" x="13" y="22" width="10" height="18" rx="2" fill="#ef5350"/><path class="c2" d="M32 8v10M32 36v12" stroke="#26a69a" stroke-width="3"/><rect class="c2" x="27" y="18" width="10" height="18" rx="2" fill="#26a69a"/><path class="c3" d="M46 20v6M46 46v8" stroke="#26a69a" stroke-width="3"/><rect class="c3" x="41" y="26" width="10" height="20" rx="2" fill="#26a69a"/></g></svg></div>
+  <div class="sp-t">Nerdy<span>Trade</span></div>
+  <div class="sp-tag">Train your trading intuition</div>
+  <svg class="sp-line" viewBox="0 0 300 40" aria-hidden="true"><polyline points="0,30 30,26 50,32 80,18 105,24 135,10 160,16 190,6 225,14 255,4 300,9"/></svg>
+  <div class="sp-bar"><i></i></div>
   <div class="sp-s">Loading market engine…</div>
 </div>
 
@@ -27,8 +32,8 @@
   <!-- ============ TOP BAR ============ -->
   <header id="topbar">
     <div class="brand">
-      <svg width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#131722"/><g stroke-linecap="round"><path d="M18 14v8M18 40v10" stroke="#ef5350" stroke-width="3"/><rect x="13" y="22" width="10" height="18" rx="2" fill="#ef5350"/><path d="M32 8v10M32 36v12" stroke="#26a69a" stroke-width="3"/><rect x="27" y="18" width="10" height="18" rx="2" fill="#26a69a"/><path d="M46 20v6M46 46v8" stroke="#26a69a" stroke-width="3"/><rect x="41" y="26" width="10" height="20" rx="2" fill="#26a69a"/></g></svg>
-      <b>Nerdy<span>Trade</span></b>
+      <svg class="brandic" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#131722"/><g stroke-linecap="round"><path d="M18 14v8M18 40v10" stroke="#ef5350" stroke-width="3"/><rect x="13" y="22" width="10" height="18" rx="2" fill="#ef5350"/><path d="M32 8v10M32 36v12" stroke="#26a69a" stroke-width="3"/><rect x="27" y="18" width="10" height="18" rx="2" fill="#26a69a"/><path d="M46 20v6M46 46v8" stroke="#26a69a" stroke-width="3"/><rect x="41" y="26" width="10" height="20" rx="2" fill="#26a69a"/></g></svg>
+      <b id="brandName">Nerdy<span>Trade</span></b>
     </div>
     <div class="tick"><span id="sym">—</span><div class="row"><span id="px" class="num">—</span><span id="chg" class="num"></span></div></div>
     <span class="sep"></span>
@@ -36,9 +41,10 @@
     <button class="btn" id="tfMore" title="All timeframes"><span id="tfMoreLbl" class="menu-btn-label">More</span><i data-ic="chev" data-sz="14" class="caret"></i></button>
     <span class="sep"></span>
     <button class="btn" id="btnStyle" title="Chart style"><i id="styleIc" data-ic="candles"></i><i data-ic="chev" data-sz="14" class="caret"></i></button>
-    <button class="btn" id="btnInd" title="Indicators"><i data-ic="activity"></i><span>Indicators</span><i data-ic="chev" data-sz="14" class="caret"></i></button>
-    <button class="btn" id="btnLevels" title="Levels: PD / PW / PM / Day / ORB"><i data-ic="levels"></i><span>Levels</span><i data-ic="chev" data-sz="14" class="caret"></i></button>
-    <button class="btn" id="btnNaked" title="Naked price — hide all indicators & levels (H)"><i id="nakedIc" data-ic="eye"></i><span>Naked</span></button>
+    <button class="btn icon ib" id="btnInd" title="Indicators"><i data-ic="activity" data-sz="20"></i><b class="badge" id="indBadge" style="display:none"></b></button>
+    <button class="btn icon ib" id="btnLevels" title="Levels: PD / PW / PM / Day / ORB"><i data-ic="levels" data-sz="20"></i><b class="badge" id="lvBadge" style="display:none"></b></button>
+    <button class="btn icon ib" id="btnObj" title="Objects: show / hide / style / remove"><i data-ic="list" data-sz="20"></i></button>
+    <button class="btn icon" id="btnNaked" title="Naked price — hide all indicators & levels (H)"><i id="nakedIc" data-ic="eye" data-sz="20"></i></button>
     <span class="grow"></span>
     <button class="btn solid" id="btnNext" title="Load a new random chart (N)"><i data-ic="dice"></i><span>New chart</span></button>
     <button class="btn icon" id="btnTheme" title="Light / dark theme (T)"><i id="themeIc" data-ic="moon"></i></button>
@@ -54,14 +60,16 @@
     <!-- ============ LEFT RAIL ============ -->
     <nav id="rail">
       <button class="btn icon on" id="toolCursor" title="Cursor (Esc)"><i data-ic="crosshair"></i></button>
-      <button class="btn icon" id="toolMeasure" title="Measure (M)"><i data-ic="ruler"></i></button>
-      <button class="btn icon" id="toolHline" title="Horizontal line (L)"><i data-ic="hline"></i></button>
+      <button class="btn icon" id="toolDraw" title="Drawing tools"><i id="toolDrawIc" data-ic="pencil"></i></button>
       <button class="btn icon" id="toolAnchor" title="Anchor VWAP — tap a candle"><i data-ic="anchor"></i></button>
-      <button class="btn icon" id="toolClear" title="Remove my lines & measure"><i data-ic="trash"></i></button>
+      <button class="btn icon" id="toolMagnet" title="Magnet — snap drawings to O/H/L/C"><i data-ic="magnet"></i></button>
+      <button class="btn icon" id="toolHideDraw" title="Hide / show all drawings"><i id="toolHideDrawIc" data-ic="eye"></i></button>
+      <button class="btn icon" id="toolClear" title="Remove all my drawings"><i data-ic="trash"></i></button>
       <div class="rsep"></div>
       <button class="btn icon" id="railGrid" title="Grid"><i data-ic="grid"></i></button>
       <button class="btn icon" id="railBreaks" title="Session breaks"><i data-ic="layers"></i></button>
       <button class="btn icon" id="railCross" title="Crosshair"><i data-ic="target"></i></button>
+      <button class="btn icon" id="railFloat" title="Hide / show floating controls (F)"><i data-ic="float"></i></button>
       <div class="grow"></div>
       <button class="btn icon" id="toolFit" title="Reset view (double-click chart)"><i data-ic="fit"></i></button>
     </nav>
@@ -72,6 +80,7 @@
       <div id="watermark"><div class="s" id="wmSym"></div><div class="t" id="wmTf"></div></div>
 
       <div id="dock">
+        <button class="btn icon sm hbtn" id="dockHide" title="Hide this bar"><i data-ic="x" data-sz="13"></i></button>
         <div class="stepper qtywrap" style="gap:2px"><button class="btn sm" data-step="-1" title="Qty −"><i data-ic="minus" data-sz="14"></i></button><input type="number" id="dockQty" min="1" value="10"><button class="btn sm" data-step="1" title="Qty +"><i data-ic="plus" data-sz="14"></i></button></div>
         <button class="btn sm buy" id="dockBuy" title="Buy at market (B)">BUY</button>
         <button class="btn sm sell" id="dockSell" title="Sell at market (S)">SELL</button>
@@ -83,6 +92,7 @@
       <button class="btn solid sm" id="jumpLive"><i data-ic="fast" data-sz="14"></i> Jump to live</button>
 
       <div id="replayBar">
+        <button class="btn icon sm hbtn" id="rpHide" title="Hide this bar"><i data-ic="x" data-sz="13"></i></button>
         <button class="btn icon" id="rpRestart" title="Restart this chart (R)"><i data-ic="restart"></i></button>
         <button class="btn icon" id="rpStep" title="Step to next candle (→)"><i data-ic="stepf"></i></button>
         <button class="btn icon play" id="rpPlay" title="Play / Pause (Space)"><i id="rpPlayIc" data-ic="pause"></i></button>
@@ -90,6 +100,7 @@
         <select id="rpSpeed" title="Replay speed ([ and ])"></select>
         <div class="clock num"><b id="rpClock">—</b><span id="rpDate">—</span></div>
       </div>
+      <button class="btn icon sm" id="floatRestore" title="Show floating controls (F)"><i data-ic="float" data-sz="16"></i></button>
       <div id="hint">Drag to pan · wheel / pinch to zoom · tap = crosshair · hold & drag = move it · grab TP / SL pills to move them</div>
     </main>
 
@@ -239,6 +250,7 @@
 </div>
 
 <div class="menu" id="menu"></div>
+<div class="menu objp" id="objPanel"></div>
 <div id="modal"><div class="mbox">
   <div class="mhead"><span>Settings</span><button class="btn icon" id="mClose"><i data-ic="x"></i></button></div>
   <div class="mmain"><div class="mtabs" id="mTabs"></div><div class="mbody" id="mBody"></div></div>

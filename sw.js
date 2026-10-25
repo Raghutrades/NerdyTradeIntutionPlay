@@ -1,5 +1,5 @@
 /* NerdyTradeIntuition service worker — offline-first app shell */
-const VERSION = 'nti-v2-3';
+const VERSION = 'nti-v2-4';
 const SHELL = ['./', 'index.html', 'style.css', 'manifest.webmanifest',
   'core.js', 'data.js', 'chart.js', 'packs.js', 'risk.js', 'stats.js', 'settings.js', 'app.js', 'pwa.js',
   'icon.svg', 'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png'];

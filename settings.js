@@ -2,7 +2,7 @@
 (function (N) {
   'use strict';
   const $ = N.$;
-  const TABS = [['look', 'palette', 'Appearance'], ['chart', 'candles', 'Chart canvas'], ['replay', 'clock', 'Replay'], ['trade', 'trade', 'Trading'], ['sound', 'volume', 'Sound'], ['data', 'database', 'Data & app'], ['about', 'info', 'About']];
+  const TABS = [['look', 'palette', 'Appearance'], ['chart', 'candles', 'Chart canvas'], ['ind', 'sliders', 'Indicator styles'], ['replay', 'clock', 'Replay'], ['trade', 'trade', 'Trading'], ['sound', 'volume', 'Sound'], ['data', 'database', 'Data & app'], ['about', 'info', 'About']];
   let cur = 'look';
   // ✏️ EDIT YOUR ABOUT PAGE HERE — plain text, no code knowledge needed
   N.ABOUT = {
@@ -33,7 +33,15 @@
     const add = el => body.appendChild(el);
     if (cur === 'look') {
       add(sect('Theme'));
-      add(sel('theme', 'Interface theme', [['dark', 'Dark'], ['light', 'Light']]));
+      const th = document.createElement('div'); th.className = 'themes';
+      Object.keys(N.THEMES).forEach(k => { const t = N.THEMES[k], d = document.createElement('div'); d.className = 'themec' + (N.cfg.theme === k ? ' on' : ''); const bg = t.c[0];
+        d.innerHTML = '<div class="pv" style="background:' + bg + '"><i style="height:10px;background:#ef5350"></i><i style="height:18px;background:#26a69a"></i><i style="height:13px;background:#ef5350"></i><i style="height:20px;background:' + t.c[1] + '"></i></div>' + N.esc(t.n);
+        d.onclick = () => { N.cfg.theme = k; N.saveCfg(); N.cfgChanged('theme'); render(); }; th.appendChild(d); });
+      add(th);
+      add(sect('Name & icon'));
+      const bi = document.createElement('input'); bi.type = 'text'; bi.maxLength = 24; bi.value = N.cfg.brand || 'NerdyTrade'; bi.onchange = () => { chg('brand', bi.value.trim() || 'NerdyTrade'); N.applyBrand(); };
+      add(row('App name', 'Shown on the splash screen, top bar and tab title', bi));
+      add(tog('brandPulse', 'Pulsing icon & title', 'Soft glow animation in the top bar'));
       add(sect('Candle colours'));
       const sc = document.createElement('div'); sc.className = 'schemes';
       Object.entries(N.SCHEMES).forEach(([k, s]) => {
@@ -47,6 +55,28 @@
       add(sect('Canvas'));
       add(color('chartBg', 'Chart background', 'empty = follow theme', ''));
       add(range('fontSize', 'Chart text size', 9, 15, 1, v => v + 'px'));
+    } else if (cur === 'ind') {
+      const hint = document.createElement('div'); hint.className = 'note'; hint.textContent = 'Colour, width, line style and zone thickness for every indicator, level and drawing. Zone thickness is in tenths of an ATR (3 = 0.3 × ATR).'; add(hint);
+      let g = '';
+      Object.keys(N.STY).forEach(k => {
+        const b = N.STY[k]; if (b.g !== g) { g = b.g; add(sect(g)); }
+        const cur2 = N.sty(k), box = document.createElement('div'); box.className = 'stybox'; box.dataset.k = k;
+        const set = (prop, v) => { N.cfg.sty[k] = Object.assign(N.cfg.sty[k] || {}, { [prop]: v }); N.saveCfg(); N.restyle && N.restyle(); };
+        let h = '<div class="nm"><span>' + N.esc(b.n) + '</span></div><div class="ctls">';
+        h += '<label>Colour <input type="color" data-p="c" value="' + (/^#[0-9a-f]{6}$/i.test(cur2.c) ? cur2.c : '#888888') + '"></label>';
+        if (b.w != null) h += '<label>Width <input type="range" data-p="w" min="0.5" max="5" step="0.1" value="' + cur2.w + '"></label>';
+        if (b.t != null) h += '<label>Zone thickness <input type="range" data-p="t" min="1" max="20" step="1" value="' + cur2.t + '"></label>';
+        if (b.ds || b.d) h += '<label>Style <select data-p="d"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label>';
+        h += '<button class="btn sm solid" data-p="reset">Reset</button></div>'; box.innerHTML = h;
+        box.querySelectorAll('[data-p]').forEach(el => {
+          const p = el.dataset.p;
+          if (p === 'd') el.value = cur2.d;
+          if (p === 'reset') el.onclick = () => { delete N.cfg.sty[k]; N.saveCfg(); N.restyle && N.restyle(); render(); };
+          else el.oninput = el.onchange = () => set(p, p === 'c' || p === 'd' ? el.value : +el.value);
+        });
+        add(box);
+      });
+      const rs = btn('Reset all styles', 'restart', () => { N.cfg.sty = {}; N.saveCfg(); N.restyle && N.restyle(); render(); }); add(rs);
     } else if (cur === 'chart') {
       add(sect('Candles'));
       add(range('bodyRatio', 'Candle body width', 0.3, 0.95, 0.01, v => Math.round(v * 100) + '%'));
@@ -69,6 +99,8 @@
       add(range('indWidth', 'Indicator line width', 1, 3.5, 0.1, v => v.toFixed(1)));
       add(range('levelWidth', 'Level line width', 0.6, 3, 0.1, v => v.toFixed(1)));
       add(tog('levelLabels', 'Level labels (PDH, PWL…)'));
+      add(sect('Floating controls'));
+      [['dock', 'Order dock (qty · buy · sell)'], ['replay', 'Replay strip'], ['pills', 'TP / SL pills on the chart'], ['jump', '“Jump to live” button']].forEach(([k, n]) => { const l = document.createElement('label'); l.className = 'tog'; l.innerHTML = '<input type="checkbox"><i></i>'; const i = l.firstChild; i.checked = !!N.cfg.ui[k]; i.onchange = () => { N.cfg.ui[k] = i.checked; N.saveCfg(); N.cfgChanged('ui'); }; add(row(n, null, l)); });
     } else if (cur === 'replay') {
       add(sect('Candle formation'));
       add(sel('tickDensity', 'Tick density', [[0.5, 'Sparse'], [1, 'Normal'], [1.6, 'Busy'], [2.4, 'Very busy']], 'How many price prints form each 1m candle', parseFloat));
@@ -129,7 +161,7 @@
       const ver = document.createElement('div'); ver.className = 'note'; ver.textContent = 'NerdyTradeIntuition v2 · synthetic data for practice only — not market data, not advice.'; add(ver);
     }
   }
-  N.openSettings = function (tab) { if (tab) cur = tab; render(); $('modal').classList.add('show'); };
+  N.openSettings = function (tab, key) { if (tab) cur = tab; render(); $('modal').classList.add('show'); if (key) { const el = $('mBody').querySelector('[data-k="' + key + '"]'); if (el) { el.scrollIntoView({ block: 'center' }); el.style.outline = '2px solid var(--accent)'; } } };
   N.closeModal = function () { $('modal').classList.remove('show'); };
   N.settingsInit = function () {
     $('mClose').onclick = N.closeModal;

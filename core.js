@@ -48,8 +48,54 @@ window.NTI = window.NTI || {};
     pk1: { on: false, zzMajor: true, zzMinor: false, sd: true, sr: true, cd: true, pHammer: true, pInv: true, pEngulf: true, pStars: true, pBig: false, labels: false, sdMult: 3, srWidth: 1, srStrength: 2, srLeft: true },
     pk2: { ema: false, e13: true, e21: true, e50: true, e200: true, vwap: false, vWk: true, vMo: false, vPd: false, av: false, avDays: 5, b1: true, b2: true, b3: false, adx: false, vb: false, vbPreset: 'Strict', vbLines: true, vbMa: true, labels: false },
     lv: { pd: { hl: false, fib: false }, pw: { hl: false, fib: false }, pm: { hl: false, fib: false }, dayo: false, dayhl: false, orb: false },
-    naked: false, plan: true, side: true, panelW: 360, tab: 'trade', favTfs: [1, 5, 15, 60, 'D']
+    naked: false, plan: true, side: true, panelW: 360, tab: 'trade', favTfs: [1, 5, 15, 60, 'D'],
+    sty: {}, hidden: {}, ui: { dock: true, replay: true, pills: true, jump: true }, magnet: false, hideDraw: false, brand: 'NerdyTrade', brandPulse: true
   };
+  /* ---------- themes ---------- */
+  N.THEMES = {
+    dark: { n: 'Dark', d: 1, c: ['#131722', '#2962ff'], v: {} },
+    light: { n: 'Light', d: 0, c: ['#ffffff', '#2962ff'], v: {} },
+    midnight: { n: 'Midnight', d: 1, c: ['#0d1324', '#4f7cff'], v: { '--bg': '#070b16', '--panel': '#0d1324', '--panel2': '#141c33', '--border': '#222c4a', '--text': '#d6def5', '--dim': '#7f8bb0', '--accent': '#4f7cff', '--chartbg': '#0a0f1f', '--grid': '#17203a', '--hover': '#1a2442' } },
+    amoled: { n: 'AMOLED black', d: 1, c: ['#000000', '#00e5a8'], v: { '--bg': '#000', '--panel': '#07080b', '--panel2': '#101216', '--border': '#1c1f26', '--text': '#e6e8ee', '--dim': '#757b88', '--accent': '#00c896', '--chartbg': '#000', '--grid': '#12141a', '--hover': '#15181e' } },
+    graphite: { n: 'Graphite', d: 1, c: ['#1e1f22', '#f59e0b'], v: { '--bg': '#141517', '--panel': '#1e1f22', '--panel2': '#292b30', '--border': '#383b42', '--text': '#dcdde0', '--dim': '#8b8f98', '--accent': '#f59e0b', '--chartbg': '#191a1d', '--grid': '#26282c', '--hover': '#30333a' } },
+    dracula: { n: 'Dracula', d: 1, c: ['#282a36', '#bd93f9'], v: { '--bg': '#1e1f29', '--panel': '#282a36', '--panel2': '#343746', '--border': '#44475a', '--text': '#f8f8f2', '--dim': '#8e93b3', '--accent': '#bd93f9', '--chartbg': '#21222c', '--grid': '#2f3142', '--hover': '#3a3d50' } },
+    forest: { n: 'Forest', d: 1, c: ['#10201a', '#34d399'], v: { '--bg': '#0a1511', '--panel': '#10201a', '--panel2': '#172b23', '--border': '#25402f', '--text': '#d3e8dc', '--dim': '#7fa08e', '--accent': '#34d399', '--chartbg': '#0c1914', '--grid': '#162a21', '--hover': '#1c3329' } },
+    ocean: { n: 'Ocean', d: 1, c: ['#0b2230', '#22d3ee'], v: { '--bg': '#06161f', '--panel': '#0b2230', '--panel2': '#112e40', '--border': '#1d4258', '--text': '#d4eaf5', '--dim': '#7ea4b8', '--accent': '#22d3ee', '--chartbg': '#081c28', '--grid': '#12303f', '--hover': '#173a4d' } },
+    solar: { n: 'Solarized dark', d: 1, c: ['#073642', '#b58900'], v: { '--bg': '#002b36', '--panel': '#073642', '--panel2': '#0d4251', '--border': '#1d5262', '--text': '#eee8d5', '--dim': '#93a1a1', '--accent': '#2aa198', '--chartbg': '#04303b', '--grid': '#0e414f', '--hover': '#14505f' } },
+    paper: { n: 'Paper', d: 0, c: ['#f6f0e4', '#b45309'], v: { '--bg': '#ebe3d2', '--panel': '#f6f0e4', '--panel2': '#ece4d3', '--border': '#d9cfb9', '--text': '#2c2416', '--dim': '#7d725c', '--accent': '#b45309', '--chartbg': '#fbf7ee', '--grid': '#eee6d4', '--hover': '#e6dcc6' } },
+    mint: { n: 'Mint', d: 0, c: ['#f2faf6', '#059669'], v: { '--bg': '#e1f0e8', '--panel': '#f2faf6', '--panel2': '#e6f3ec', '--border': '#cde3d6', '--text': '#10241a', '--dim': '#5b7a69', '--accent': '#059669', '--chartbg': '#fbfffd', '--grid': '#e9f4ee', '--hover': '#ddeee4' } },
+    rose: { n: 'Rose', d: 0, c: ['#fff5f7', '#e11d48'], v: { '--bg': '#f8e4ea', '--panel': '#fff5f7', '--panel2': '#fbe9ee', '--border': '#f0cfd8', '--text': '#2a1218', '--dim': '#86606b', '--accent': '#e11d48', '--chartbg': '#fffafb', '--grid': '#f8e9ee', '--hover': '#f6dde4' } }
+  };
+  N.isDark = () => !!(N.THEMES[N.cfg.theme] || N.THEMES.dark).d;
+  let themeKeys = [];
+  N.applyThemeVars = () => {
+    const t = N.THEMES[N.cfg.theme] || N.THEMES.dark, r = document.documentElement;
+    themeKeys.forEach(k => r.style.removeProperty(k)); themeKeys = Object.keys(t.v);
+    themeKeys.forEach(k => r.style.setProperty(k, t.v[k]));
+    r.dataset.theme = t.d ? 'dark' : 'light';
+  };
+  /* ---------- indicator / drawing styles (colour, width, zone thickness, dash) ---------- */
+  N.STY = {
+    vwap: { n: 'VWAP (session)', g: 'Built-in', c: '#f5a623', w: 1.8 }, avwap: { n: '5-day anchored VWAP', g: 'Built-in', c: '#3b82f6', w: 1.8 },
+    ema9: { n: 'EMA 9', g: 'Built-in', c: '#e879f9', w: 1.8 }, ema21: { n: 'EMA 21', g: 'Built-in', c: '#38bdf8', w: 1.8 },
+    zzMajUp: { n: 'Zig-zag major · up leg', g: 'Market structure', c: '#4caf50', w: 1.2, ds: 1 }, zzMajDn: { n: 'Zig-zag major · down leg', g: 'Market structure', c: '#f44336', w: 1.2, ds: 1 },
+    zzMinUp: { n: 'Zig-zag minor · up leg', g: 'Market structure', c: '#64b5f6', w: 1, d: 'dotted', ds: 1 }, zzMinDn: { n: 'Zig-zag minor · down leg', g: 'Market structure', c: '#ffa726', w: 1, d: 'dotted', ds: 1 },
+    supply: { n: 'Supply zone', g: 'Market structure', c: '#e91e63', t: 3, z: 1 }, demand: { n: 'Demand zone', g: 'Market structure', c: '#2156f3', t: 3, z: 1 },
+    srSup: { n: 'Support zone', g: 'Market structure', c: '#009688', t: 3, z: 1 }, srRes: { n: 'Resistance zone', g: 'Market structure', c: '#ff5252', t: 3, z: 1 },
+    patBull: { n: 'Bullish pattern marker', g: 'Market structure', c: '#26a69a' }, patBear: { n: 'Bearish pattern marker', g: 'Market structure', c: '#ef5350' },
+    e13: { n: 'EMA 13', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#00bcd4', w: 1.8 }, e21: { n: 'EMA 21 (pack)', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#ff00c8', w: 1.8 },
+    e50: { n: 'EMA 50', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#ff9800', w: 1.8 }, e200: { n: 'EMA 200', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#ffffff', c2: '#555a66', w: 1.8 },
+    vWk: { n: 'Weekly VWAP', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#c84b00', w: 1.6 }, vMo: { n: 'Monthly VWAP', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#aa00aa', w: 1.6 }, vPd: { n: 'Previous-day VWAP', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#008080', w: 1.6 },
+    av: { n: 'Anchored VWAP', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#3b82f6', w: 2 }, b1: { n: 'AVWAP 1σ bands', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#22c55e', w: 1 }, b2: { n: 'AVWAP 2σ bands', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#f59e0b', w: 1 }, b3: { n: 'AVWAP 3σ bands', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#ef4444', w: 1 },
+    boUp: { n: 'Breakout marker / level', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#00e676', w: 2 }, boDn: { n: 'Breakdown marker / level', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#ff1744', w: 2 },
+    lvRes: { n: 'Major resistance line', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#ef5350', w: 1, d: 'dashed', ds: 1 }, lvSup: { n: 'Major support line', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#26a69a', w: 1, d: 'dashed', ds: 1 },
+    pd: { n: 'Previous day H/L', g: 'Levels', c: '#2f7bff', w: 1.2, ds: 1 }, pw: { n: 'Previous week H/L', g: 'Levels', c: '#ff9800', w: 1.8, ds: 1 }, pm: { n: 'Previous month H/L', g: 'Levels', c: '#b455e8', w: 2.4, ds: 1 },
+    dayo: { n: 'Day open', g: 'Levels', c: '#94a3b8', w: 1.2, d: 'dashed', ds: 1 }, dayhl: { n: 'Day high / low', g: 'Levels', c: '#fbbf24', w: 1.2, ds: 1 }, orb: { n: 'Opening range', g: 'Levels', c: '#22d3ee', w: 1.2, ds: 1 },
+    draw: { n: 'New drawings (default)', g: 'Drawings', c: '#f59e0b', w: 1.6 }
+  };
+  N.sty = k => { const b = N.STY[k] || {}, o = (N.cfg.sty && N.cfg.sty[k]) || {}; return { c: o.c || b.c, w: o.w != null ? o.w : b.w, t: o.t != null ? o.t : b.t, d: o.d || b.d || 'solid' }; };
+  N.dashOf = d => d === 'dashed' ? [6, 4] : d === 'dotted' ? [2, 3] : null;
+  N.rgba = (hex, a) => { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return hex; const n = parseInt(m[1], 16); return 'rgba(' + (n >> 16) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')'; };
   N.SCHEMES = {
     tv: { name: 'TradingView', up: '#26a69a', down: '#ef5350' },
     classic: { name: 'Classic', up: '#22c55e', down: '#ef4444' },
@@ -82,6 +128,15 @@ window.NTI = window.NTI || {};
   /* ---------- icons ---------- */
   const I = {
     play: '<polygon points="7 4 20 12 7 20 7 4" fill="currentColor"/>',
+    trend: '<path d="M4 19 20 5"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="5" r="2"/>',
+    ray: '<path d="M4 18 21 4"/><circle cx="4" cy="18" r="2"/><path d="M16 4h5v5"/>',
+    rect: '<rect x="4" y="6" width="16" height="12" rx="1"/>',
+    fibi: '<path d="M3 4h18M3 9h18M3 15h18M3 20h18"/><path d="M12 4v16" stroke-dasharray="2 2"/>',
+    vline: '<path d="M12 3v18"/><circle cx="12" cy="12" r="2.5"/>',
+    magnet: '<path d="M6 15V4h4v11a2 2 0 0 0 4 0V4h4v11a6 6 0 0 1-12 0z"/><path d="M6 8h4M14 8h4"/>',
+    pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    float: '<rect x="3" y="14" width="18" height="6" rx="2"/><rect x="8" y="4" width="13" height="6" rx="2"/>',
     pause: '<rect x="6" y="4" width="4.5" height="16" rx="1" fill="currentColor"/><rect x="13.5" y="4" width="4.5" height="16" rx="1" fill="currentColor"/>',
     stepf: '<polygon points="5 4 15 12 5 20 5 4" fill="currentColor"/><path d="M19 5v14"/>',
     fast: '<polygon points="4 5 12 12 4 19 4 5" fill="currentColor"/><polygon points="12 5 20 12 12 19 12 5" fill="currentColor"/>',
