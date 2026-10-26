@@ -49,7 +49,8 @@ window.NTI = window.NTI || {};
     pk2: { ema: false, e13: true, e21: true, e50: true, e200: true, vwap: false, vWk: true, vMo: false, vPd: false, av: false, avDays: 5, b1: true, b2: true, b3: false, adx: false, vb: false, vbPreset: 'Strict', vbLines: true, vbMa: true, labels: false },
     lv: { pd: { hl: false, fib: false }, pw: { hl: false, fib: false }, pm: { hl: false, fib: false }, dayo: false, dayhl: false, orb: false },
     naked: false, plan: true, side: true, panelW: 360, tab: 'trade', favTfs: [1, 5, 15, 60, 'D'],
-    sty: {}, hidden: {}, ui: { dock: true, replay: true, pills: true, jump: true }, magnet: false, hideDraw: false, brand: 'NerdyTrade', brandPulse: true
+    sty: {}, hidden: {}, ui: { dock: true, replay: true, pills: true, jump: true, lines: true, strip: true, selbar: true, orderBtn: true, quote: true }, dockPos: null, replayPos: null, magnet: false, hideDraw: false, brand: 'NerdyTrade', brandPulse: true,
+    axisW: 66, quoteSec: 5, splashSec: 3.4, blowPct: 25, stripSize: 12, lockDraw: false, stayDraw: false, volAlpha: 0.5
   };
   /* ---------- themes ---------- */
   N.THEMES = {
@@ -91,7 +92,10 @@ window.NTI = window.NTI || {};
     lvRes: { n: 'Major resistance line', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#ef5350', w: 1, d: 'dashed', ds: 1 }, lvSup: { n: 'Major support line', g: 'Fibs · VWAP · EMA · ADX · Volume', c: '#26a69a', w: 1, d: 'dashed', ds: 1 },
     pd: { n: 'Previous day H/L', g: 'Levels', c: '#2f7bff', w: 1.2, ds: 1 }, pw: { n: 'Previous week H/L', g: 'Levels', c: '#ff9800', w: 1.8, ds: 1 }, pm: { n: 'Previous month H/L', g: 'Levels', c: '#b455e8', w: 2.4, ds: 1 },
     dayo: { n: 'Day open', g: 'Levels', c: '#94a3b8', w: 1.2, d: 'dashed', ds: 1 }, dayhl: { n: 'Day high / low', g: 'Levels', c: '#fbbf24', w: 1.2, ds: 1 }, orb: { n: 'Opening range', g: 'Levels', c: '#22d3ee', w: 1.2, ds: 1 },
-    draw: { n: 'New drawings (default)', g: 'Drawings', c: '#f59e0b', w: 1.6 }
+    draw: { n: 'New drawings (default)', g: 'Drawings', c: '#f59e0b', w: 1.6 },
+    posTp: { n: 'Position tool · target zone', g: 'Drawings', c: '#26a69a', t: 1 }, posSl: { n: 'Position tool · stop zone', g: 'Drawings', c: '#ef5350', t: 1 },
+    sess: { n: 'Session break lines', g: 'Chart canvas', c: '', w: 1, d: 'dotted', ds: 1 }, grid: { n: 'Grid lines', g: 'Chart canvas', c: '', w: 1, ds: 1 },
+    cross: { n: 'Crosshair', g: 'Chart canvas', c: '', w: 1, ds: 1 }, last: { n: 'Last-price line', g: 'Chart canvas', c: '', w: 1, d: 'dotted', ds: 1 }
   };
   N.sty = k => { const b = N.STY[k] || {}, o = (N.cfg.sty && N.cfg.sty[k]) || {}; return { c: o.c || b.c, w: o.w != null ? o.w : b.w, t: o.t != null ? o.t : b.t, d: o.d || b.d || 'solid' }; };
   N.dashOf = d => d === 'dashed' ? [6, 4] : d === 'dotted' ? [2, 3] : null;
@@ -154,6 +158,35 @@ window.NTI = window.NTI || {};
     area: '<path d="M3 17l6-6 4 4 8-8v13H3z"/>',
     layers: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
     levels: '<path d="M3 5h18M3 12h18M3 19h18" stroke-dasharray="3 3"/>',
+    extline: '<path d="M2 20 22 4"/><circle cx="9" cy="14.5" r="2"/><circle cx="16" cy="9" r="2"/>',
+    hray: '<path d="M6 12h16"/><circle cx="6" cy="12" r="2"/>',
+    arrow: '<path d="M4 20 19 5"/><path d="M10 5h9v9"/>',
+    ellipse: '<ellipse cx="12" cy="12" rx="9" ry="6"/>',
+    tri: '<path d="M4 19 12 5l8 14z"/>',
+    channel: '<path d="M3 17 17 5M7 21 21 9"/>',
+    fibext: '<path d="M3 5h18M3 11h18M3 16h18M3 21h18"/><path d="M8 3v18" stroke-dasharray="2 2"/>',
+    text: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
+    brush: '<path d="M3 17c3-6 5 2 8-4s4-1 6-5 2-2 4-3"/>',
+    prange: '<path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/>',
+    longpos: '<rect x="3" y="4" width="18" height="7" fill="currentColor" fill-opacity=".25"/><rect x="3" y="11" width="18" height="9"/><path d="M3 11h18"/>',
+    shortpos: '<rect x="3" y="13" width="18" height="7" fill="currentColor" fill-opacity=".25"/><rect x="3" y="4" width="18" height="9"/><path d="M3 13h18"/>',
+    undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+    redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',
+    fullscreen: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
+    fullexit: '<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>',
+    refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/><path d="M3 12A9 9 0 0 1 18.5 5.8L21 8"/><path d="M21 3v5h-5"/>',
+    wallet: '<path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15V7"/><circle cx="16.5" cy="14" r="1.2" fill="currentColor"/>',
+    gauge: '<path d="M12 14l4-4"/><path d="M3.3 17a10 10 0 1 1 17.4 0"/>',
+    calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+    unlock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
+    dashb: '<rect x="3" y="3" width="8" height="10" rx="1.5"/><rect x="13" y="3" width="8" height="6" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="15" width="8" height="6" rx="1.5"/>',
+    quote: '<path d="M7 7h4v5a4 4 0 0 1-4 4M15 7h4v5a4 4 0 0 1-4 4"/>',
+    flagmk: '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4L17 12H5"/>',
+    pin: '<path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+    plusc: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    gripd: '<circle cx="9" cy="6" r="1.3" fill="currentColor"/><circle cx="15" cy="6" r="1.3" fill="currentColor"/><circle cx="9" cy="12" r="1.3" fill="currentColor"/><circle cx="15" cy="12" r="1.3" fill="currentColor"/><circle cx="9" cy="18" r="1.3" fill="currentColor"/><circle cx="15" cy="18" r="1.3" fill="currentColor"/>',
+    copy2: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
     chev: '<polyline points="6 9 12 15 18 9"/>',
     check: '<polyline points="20 6 9 17 4 12"/>',
     x: '<path d="M18 6 6 18M6 6l12 12"/>',

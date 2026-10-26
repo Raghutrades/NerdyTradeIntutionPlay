@@ -55,6 +55,9 @@
       add(sect('Canvas'));
       add(color('chartBg', 'Chart background', 'empty = follow theme', ''));
       add(range('fontSize', 'Chart text size', 9, 15, 1, v => v + 'px'));
+      add(range('axisW', 'Price-axis width', 52, 96, 1, v => v + 'px', 'Wider = bigger price labels fit'));
+      add(range('volPct', 'Volume bar height', 0.08, 0.5, 0.01, v => Math.round(v * 100) + '%', 'of the chart height'));
+      add(range('volAlpha', 'Volume bar opacity', 0.15, 1, 0.05, v => Math.round(v * 100) + '%'));
     } else if (cur === 'ind') {
       const hint = document.createElement('div'); hint.className = 'note'; hint.textContent = 'Colour, width, line style and zone thickness for every indicator, level and drawing. Zone thickness is in tenths of an ATR (3 = 0.3 × ATR).'; add(hint);
       let g = '';
@@ -99,8 +102,12 @@
       add(range('indWidth', 'Indicator line width', 1, 3.5, 0.1, v => v.toFixed(1)));
       add(range('levelWidth', 'Level line width', 0.6, 3, 0.1, v => v.toFixed(1)));
       add(tog('levelLabels', 'Level labels (PDH, PWL…)'));
-      add(sect('Floating controls'));
-      [['dock', 'Order dock (qty · buy · sell)'], ['replay', 'Replay strip'], ['pills', 'TP / SL pills on the chart'], ['jump', '“Jump to live” button']].forEach(([k, n]) => { const l = document.createElement('label'); l.className = 'tog'; l.innerHTML = '<input type="checkbox"><i></i>'; const i = l.firstChild; i.checked = !!N.cfg.ui[k]; i.onchange = () => { N.cfg.ui[k] = i.checked; N.saveCfg(); N.cfgChanged('ui'); }; add(row(n, null, l)); });
+      add(sect('Floating controls — drag the ⋮⋮ grip on the dock / replay strip to place them anywhere'));
+      [['dock', 'Order dock (qty · SL · TP · buy · sell)'], ['replay', 'Replay strip'], ['pills', 'TP / SL pills on the chart'], ['lines', 'TP / SL / plan lines on the chart'], ['jump', '“Jump to live” button'], ['strip', 'Date & quote strip (top)'], ['orderBtn', '＋ order button on the price axis'], ['selbar', 'Drawing toolbar (colour · width · lock · delete)']].forEach(([k, n]) => { const l = document.createElement('label'); l.className = 'tog'; l.innerHTML = '<input type="checkbox"><i></i>'; const i = l.firstChild; i.checked = !!N.cfg.ui[k]; i.onchange = () => { N.cfg.ui[k] = i.checked; N.saveCfg(); N.cfgChanged('ui'); }; add(row(n, null, l)); });
+      add(btn('Reset floating panel positions', 'restart', () => N.resetFloatPos()));
+      add(sect('Top strip & splash'));
+      add(range('quoteSec', 'New quote every', 2, 20, 1, v => v + ' s'));
+      add(range('splashSec', 'Splash screen duration', 1, 8, 0.2, v => v.toFixed(1) + ' s', 'Tap the splash to skip'));
     } else if (cur === 'replay') {
       add(sect('Candle formation'));
       add(sel('tickDensity', 'Tick density', [[0.5, 'Sparse'], [1, 'Normal'], [1.6, 'Busy'], [2.4, 'Very busy']], 'How many price prints form each 1m candle', parseFloat));
@@ -112,7 +119,9 @@
     } else if (cur === 'trade') {
       add(sect('Costs & capital'));
       add(sel('segment', 'Charge segment', [['intraday', 'Equity intraday'], ['delivery', 'Delivery'], ['futures', 'Futures'], ['options', 'Options']], 'Charges are deducted from every logged trade'));
-      add(num('capital', 'Capital (₹)', 1000, 1000, 'Drives ROI, drawdown % and risk sizing'));
+      add(num('capital', 'Default capital (₹)', 1000, 1000, 'Used for a brand-new account and as the default top-up'));
+      add(num('blowPct', 'Blow-up level (% of capital)', 0, 5, 'Account counts as blown at or below this share of the capital you put in'));
+      const cw = document.createElement('div'); cw.className = 'btnrow'; cw.appendChild(btn('Add capital', 'plus', () => { N.closeModal(); N.capitalAction('deposit'); })); cw.appendChild(btn('Withdraw', 'minus', () => { N.closeModal(); N.capitalAction('withdraw'); })); cw.appendChild(btn('Open dashboard', 'dashb', () => { N.closeModal(); N.openDash('account'); })); add(cw);
       add(sect('Order ticket defaults (for each new chart)'));
       add(num('defQty', 'Default quantity', 1, 1));
       add(num('defSlPct', 'Default stop distance (% of price)', 0.05, 0.05));
@@ -157,8 +166,9 @@
       rw2.appendChild(btn('Install app', 'install', () => N.promptInstall && N.promptInstall()));
       rw2.appendChild(btn('Reset settings', 'restart', () => { if (confirm('Reset all settings to defaults? (Journal is kept.)')) { N.resetCfg(); N.cfgChanged('*'); render(); } }, 'solid'));
       rw2.appendChild(btn('Check for update', 'download', () => N.checkUpdate && N.checkUpdate()));
+      rw2.appendChild(btn('Refresh app', 'refresh', () => N.hardRefresh()));
       add(rw2);
-      const ver = document.createElement('div'); ver.className = 'note'; ver.textContent = 'NerdyTradeIntuition v2 · synthetic data for practice only — not market data, not advice.'; add(ver);
+      const ver = document.createElement('div'); ver.className = 'note'; ver.textContent = 'NerdyTradeIntuition v5 · synthetic data for practice only — not market data, not advice.'; add(ver);
     }
   }
   N.openSettings = function (tab, key) { if (tab) cur = tab; render(); $('modal').classList.add('show'); if (key) { const el = $('mBody').querySelector('[data-k="' + key + '"]'); if (el) { el.scrollIntoView({ block: 'center' }); el.style.outline = '2px solid var(--accent)'; } } };

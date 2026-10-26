@@ -187,7 +187,7 @@
         '<div class="l1"><span><b class="' + (t.dir === 1 ? 'pos' : 'neg') + '">' + (t.dir === 1 ? 'LONG' : 'SHORT') + '</b> <b>' + esc(t.sym) + '</b> ×' + t.qty + '</span><b class="num ' + cl(t.net) + '" style="font-size:14px">' + sg(t.net, 2) + '</b></div>' +
         '<div class="l2 num">' + t.entry.toFixed(2) + ' → ' + t.exit.toFixed(2) + (t.r != null ? ' · <span class="' + cl(t.r) + '">' + (t.r >= 0 ? '+' : '') + t.r.toFixed(2) + 'R</span>' : '') + ' · ' + esc(t.reason || '') + (t.charges ? ' · fees ' + inr(t.charges, 0) : '') + '</div>' +
         '<div class="l2 num">' + when + (t.clock ? ' · chart ' + esc(t.clock) : '') + (t.dur != null ? ' · held ' + N.dur(t.dur) : '') + (t.mfe != null && t.risk ? ' · MFE ' + (t.mfe / t.risk).toFixed(1) + 'R / MAE ' + (t.mae / t.risk).toFixed(1) + 'R' : '') + '</div>' +
-        '<div class="l3"><select data-f="tag">' + TAGS.map(g => '<option value="' + esc(g) + '"' + (g === (t.tag || '') ? ' selected' : '') + '>' + (g || '— tag —') + '</option>').join('') + '</select><input type="text" data-f="note" placeholder="note…" value="' + esc(t.note || '') + '"><span style="white-space:nowrap">' + (t.seed ? '<button class="btn sm" data-a="review" title="Re-open this chart 40 min before entry"><i data-ic="restart" data-sz="14"></i></button>' : '') + '<button class="btn sm danger" data-a="del" title="Delete"><i data-ic="x" data-sz="14"></i></button></span></div></div>';
+        '<div class="l3"><select data-f="tag">' + TAGS.map(g => '<option value="' + esc(g) + '"' + (g === (t.tag || '') ? ' selected' : '') + '>' + (g || '— tag —') + '</option>').join('') + '</select><input type="text" data-f="note" placeholder="note…" value="' + esc(t.note || '') + '"><span style="white-space:nowrap">' + (t.seed ? '<button class="btn sm" data-a="view" title="See this trade on its chart"><i data-ic="candles" data-sz="14"></i></button><button class="btn sm" data-a="review" title="Re-open this chart 40 min before entry"><i data-ic="restart" data-sz="14"></i></button>' : '') + '<button class="btn sm danger" data-a="del" title="Delete"><i data-ic="x" data-sz="14"></i></button></span></div></div>';
     }).join('') + (T.list.length > 150 ? '<div class="note">Showing latest 150 of ' + T.list.length + ' — export CSV for everything.</div>' : '');
     N.hydrate(host);
   };
@@ -198,6 +198,7 @@
       const b = e.target.closest('button[data-a]'); if (!b) return; const tr = b.closest('.jr[data-id]'), id = tr.dataset.id, t = T.list.find(x => x.id === id); if (!t) return;
       if (b.dataset.a === 'del') { if (confirm('Delete this trade from your journal?')) { T.remove(id); N.refreshAll(); } }
       else if (b.dataset.a === 'review') N.reviewTrade && N.reviewTrade(t);
+      else if (b.dataset.a === 'view') N.openTradeView && N.openTradeView(t, T.list.slice().reverse());
     });
     $('stRange').onchange = e => { statsFilter.range = e.target.value; N.renderStats(); };
     $('stSym').onchange = e => { statsFilter.sym = e.target.value; N.renderStats(); };

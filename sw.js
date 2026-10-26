@@ -1,7 +1,7 @@
 /* NerdyTradeIntuition service worker — offline-first app shell */
-const VERSION = 'nti-v2-4';
+const VERSION = 'nti-v2-5';
 const SHELL = ['./', 'index.html', 'style.css', 'manifest.webmanifest',
-  'core.js', 'data.js', 'chart.js', 'packs.js', 'risk.js', 'stats.js', 'settings.js', 'app.js', 'pwa.js',
+  'quotes.js', 'core.js', 'data.js', 'chart.js', 'draw.js', 'packs.js', 'risk.js', 'stats.js', 'dash.js', 'settings.js', 'app.js', 'pwa.js',
   'icon.svg', 'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

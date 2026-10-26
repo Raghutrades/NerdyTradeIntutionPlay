@@ -23,6 +23,7 @@
     <svg width="92" height="92" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#131722"/><g stroke-linecap="round"><path class="c1" d="M18 14v8M18 40v10" stroke="#ef5350" stroke-width="3"/><rect class="c1" x="13" y="22" width="10" height="18" rx="2" fill="#ef5350"/><path class="c2" d="M32 8v10M32 36v12" stroke="#26a69a" stroke-width="3"/><rect class="c2" x="27" y="18" width="10" height="18" rx="2" fill="#26a69a"/><path class="c3" d="M46 20v6M46 46v8" stroke="#26a69a" stroke-width="3"/><rect class="c3" x="41" y="26" width="10" height="20" rx="2" fill="#26a69a"/></g></svg></div>
   <div class="sp-t">Nerdy<span>Trade</span></div>
   <div class="sp-tag">Train your trading intuition</div>
+  <div class="sp-q" id="spQuote"><em></em><small></small></div>
   <svg class="sp-line" viewBox="0 0 300 40" aria-hidden="true"><polyline points="0,30 30,26 50,32 80,18 105,24 135,10 160,16 190,6 225,14 255,4 300,9"/></svg>
   <div class="sp-bar"><i></i></div>
   <div class="sp-s">Loading market engine…</div>
@@ -48,6 +49,9 @@
     <span class="grow"></span>
     <button class="btn solid" id="btnNext" title="Load a new random chart (N)"><i data-ic="dice"></i><span>New chart</span></button>
     <button class="btn icon" id="btnTheme" title="Light / dark theme (T)"><i id="themeIc" data-ic="moon"></i></button>
+    <button class="btn icon" id="btnDash" title="Performance dashboard (D)"><i data-ic="dashb"></i></button>
+    <button class="btn icon" id="btnFull" title="Full-screen chart (X)"><i id="btnFullIc" data-ic="fullscreen"></i></button>
+    <button class="btn icon" id="btnRefresh" title="Refresh app — load the latest version"><i data-ic="refresh"></i></button>
     <button class="btn icon" id="btnShot" title="Save chart screenshot"><i data-ic="camera"></i></button>
     <button class="btn icon only-m" id="btnTools" title="Tools"><i data-ic="more"></i></button>
     <button class="btn icon" id="btnAbout" title="About"><i data-ic="info"></i></button>
@@ -56,12 +60,16 @@
     <button class="btn icon" id="btnSide" title="Toggle panel"><i data-ic="panel"></i></button>
   </header>
 
+  <div id="strip"><span class="sdate"><i data-ic="calendar" data-sz="14"></i><b id="stDateTxt"></b></span><span class="syear"><span id="stYear"></span><i class="syb"><b id="stYearBar"></b></i></span><span id="stQuote" class="sq" title="Tap for the next quote"><em id="sqT"></em><small id="sqA"></small></span><button class="btn icon sm hbtn" id="stripHide" title="Hide this strip"><i data-ic="x" data-sz="13"></i></button></div>
+
   <div id="body">
     <!-- ============ LEFT RAIL ============ -->
     <nav id="rail">
       <button class="btn icon on" id="toolCursor" title="Cursor (Esc)"><i data-ic="crosshair"></i></button>
       <button class="btn icon" id="toolDraw" title="Drawing tools"><i id="toolDrawIc" data-ic="pencil"></i></button>
       <button class="btn icon" id="toolAnchor" title="Anchor VWAP — tap a candle"><i data-ic="anchor"></i></button>
+      <button class="btn icon" id="toolUndo" title="Undo (Ctrl+Z)"><i data-ic="undo"></i></button>
+      <button class="btn icon" id="toolRedo" title="Redo (Ctrl+Y)"><i data-ic="redo"></i></button>
       <button class="btn icon" id="toolMagnet" title="Magnet — snap drawings to O/H/L/C"><i data-ic="magnet"></i></button>
       <button class="btn icon" id="toolHideDraw" title="Hide / show all drawings"><i id="toolHideDrawIc" data-ic="eye"></i></button>
       <button class="btn icon" id="toolClear" title="Remove all my drawings"><i data-ic="trash"></i></button>
@@ -71,6 +79,7 @@
       <button class="btn icon" id="railCross" title="Crosshair"><i data-ic="target"></i></button>
       <button class="btn icon" id="railFloat" title="Hide / show floating controls (F)"><i data-ic="float"></i></button>
       <div class="grow"></div>
+      <button class="btn icon" id="toolFull" title="Full-screen chart (X)"><i id="toolFullIc" data-ic="fullscreen"></i></button>
       <button class="btn icon" id="toolFit" title="Reset view (double-click chart)"><i data-ic="fit"></i></button>
     </nav>
 
@@ -80,18 +89,22 @@
       <div id="watermark"><div class="s" id="wmSym"></div><div class="t" id="wmTf"></div></div>
 
       <div id="dock">
+        <span class="grip" id="dockGrip" title="Drag to move · double-click to reset"><i data-ic="gripd" data-sz="16"></i></span>
         <button class="btn icon sm hbtn" id="dockHide" title="Hide this bar"><i data-ic="x" data-sz="13"></i></button>
         <div class="stepper qtywrap" style="gap:2px"><button class="btn sm" data-step="-1" title="Qty −"><i data-ic="minus" data-sz="14"></i></button><input type="number" id="dockQty" min="1" value="10"><button class="btn sm" data-step="1" title="Qty +"><i data-ic="plus" data-sz="14"></i></button></div>
+        <label class="dfield" title="Stop distance in points"><span>SL</span><input type="number" id="dockSl" step="0.05" min="0"></label>
+        <label class="dfield" title="Target distance in points"><span>TP</span><input type="number" id="dockTp" step="0.05" min="0"></label>
         <button class="btn sm buy" id="dockBuy" title="Buy at market (B)">BUY</button>
         <button class="btn sm sell" id="dockSell" title="Sell at market (S)">SELL</button>
         <button class="btn sm solid sm-hide" id="dockClose" title="Close position (C)">CLOSE</button>
         <button class="btn sm solid sm-hide" id="dockRev" title="Reverse (V)"><i data-ic="reverse" data-sz="14"></i></button>
-        <span class="rr num" id="dockRR">RR —</span>
+        <span class="rr num" id="dockRR">—</span>
       </div>
 
       <button class="btn solid sm" id="jumpLive"><i data-ic="fast" data-sz="14"></i> Jump to live</button>
 
       <div id="replayBar">
+        <span class="grip" id="rpGrip" title="Drag to move · double-click to reset"><i data-ic="gripd" data-sz="16"></i></span>
         <button class="btn icon sm hbtn" id="rpHide" title="Hide this bar"><i data-ic="x" data-sz="13"></i></button>
         <button class="btn icon" id="rpRestart" title="Restart this chart (R)"><i data-ic="restart"></i></button>
         <button class="btn icon" id="rpStep" title="Step to next candle (→)"><i data-ic="stepf"></i></button>
@@ -101,6 +114,9 @@
         <div class="clock num"><b id="rpClock">—</b><span id="rpDate">—</span></div>
       </div>
       <button class="btn icon sm" id="floatRestore" title="Show floating controls (F)"><i data-ic="float" data-sz="16"></i></button>
+      <div id="selBar"></div>
+      <div id="ordPop"></div>
+      <div id="fsBar"><button class="btn sm" id="fsTf"><i data-ic="clock" data-sz="14"></i></button><button class="btn sm" id="fsInd"><i data-ic="activity" data-sz="14"></i></button><button class="btn sm" id="fsDraw"><i data-ic="pencil" data-sz="14"></i></button><button class="btn sm" id="fsObj"><i data-ic="list" data-sz="14"></i></button><button class="btn sm solid" id="fsExit" title="Exit full screen"><i data-ic="fullexit" data-sz="14"></i></button></div>
       <div id="hint">Drag to pan · wheel / pinch to zoom · tap = crosshair · hold & drag = move it · grab TP / SL pills to move them</div>
     </main>
 
@@ -214,6 +230,7 @@
 
         <!-- STATS -->
         <div class="tp" id="tab-stats">
+          <button class="btn solid block" id="openDashBtn" style="margin-bottom:10px"><i data-ic="dashb" data-sz="16"></i> Open the full performance dashboard</button>
           <div class="row2" style="margin-bottom:10px">
             <select class="fld" id="stRange"><option value="all">All time</option><option value="today">Today</option><option value="7d">Last 7 days</option><option value="20">Last 20 trades</option><option value="50">Last 50 trades</option></select>
             <select class="fld" id="stSym"><option value="">All symbols</option></select>
@@ -244,11 +261,14 @@
     <span id="stMode">—</span>
     <span class="grow"></span>
     <span id="stToday" class="hide-m">Today —</span>
+    <span id="stBal">Balance —</span>
     <span id="stNet">Net —</span>
     <span class="rng" id="stScale"><button data-s="pct" title="Percent scale">%</button><button data-s="log" title="Logarithmic scale">log</button><button data-s="auto" title="Auto-fit price scale">auto</button></span>
   </footer>
 </div>
 
+<div id="dash"></div>
+<div id="tview"></div>
 <div class="menu" id="menu"></div>
 <div class="menu objp" id="objPanel"></div>
 <div id="modal"><div class="mbox">
@@ -258,12 +278,16 @@
 <div id="toasts"></div>
 
 <script>setTimeout(function(){var s=document.getElementById('splash');if(s&&!(window.NTI&&NTI.S)){var t=s.querySelector('.sp-s');if(t)t.innerHTML='Could not start. Make sure every file from the zip is uploaded next to index.html, then hard-refresh.';}},6000);</script>
+<script src="quotes.js"></script>
+<script>(function(){try{var L=window.NTI_QUOTES,q=L[window.NTI_QUOTE()],e=document.getElementById("spQuote");if(e){e.querySelector("em").textContent="\u201C"+q.q+"\u201D";e.querySelector("small").textContent=(q.a?"\u2014 "+q.a+" \u00B7 ":"\u2014 ")+q.t;}}catch(x){}})();</script>
 <script src="core.js"></script>
 <script src="data.js"></script>
 <script src="chart.js"></script>
+<script src="draw.js"></script>
 <script src="packs.js"></script>
 <script src="risk.js"></script>
 <script src="stats.js"></script>
+<script src="dash.js"></script>
 <script src="settings.js"></script>
 <script src="app.js"></script>
 <script src="pwa.js"></script>

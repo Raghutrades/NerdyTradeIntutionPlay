@@ -91,17 +91,21 @@
       const t0 = Math.floor((ms + 3.75 * 3600000) / 1000);
       const mb = genRegimeBars(R, G, price, SESSION_MIN, {
         capPct: 0.018 + R() * 0.014, baseVolPct: () => 0.0006 + R() * 0.0006, regimeLenMin: 12, regimeLenMax: 40, choppyChance: 0.35, driftPct: 0.0009, shockChance: 0.006, shockMult: 3.2,
-        edgeMult: (i, tot) => { const t = i / tot; return 0.65 + 0.85 * Math.pow(Math.abs(2 * t - 1), 1.3); }
+        edgeMult: (i, tot) => { const t = i / tot; return 0.85 + 0.5 * Math.pow(Math.abs(2 * t - 1), 1.6); }
       });
       const bars = [], hiPre = [], loPre = []; let hh = -Infinity, ll = Infinity;
       let prevC = null;
+      // volume model: persistent (clustered) activity + news-like spikes + coupling to bar size; the open/close bias is brief and noisy, not a smooth U
+      const dayLvl = Math.exp(G() * 0.28); let lv = G() * 0.3, spike = 0, fav = 0;
       for (let m = 0; m < SESSION_MIN; m++) {
         const b = mb[m];
         let o = N.roundTick(b.open), c = N.roundTick(b.close);
         let h = Math.max(N.roundTick(b.high), o, c), l = Math.min(N.roundTick(b.low), o, c);
         o = N.r2(o); c = N.r2(c); h = N.r2(h); l = N.r2(l);
-        const t = m / SESSION_MIN, u = 0.55 + 1.9 * Math.pow(Math.abs(2 * t - 1), 1.6);
-        const volume = Math.round(sessVolBase * u * (0.55 + 0.8 * Math.min(3, b.vol)) * (0.6 + 0.8 * R()));
+        const tt = m / SESSION_MIN, prof = (1 + 1.5 * Math.exp(-m / 6)) * (1 + 0.45 * Math.exp(-(SESSION_MIN - 1 - m) / 14)) * (1 - 0.16 * Math.exp(-Math.pow((tt - 0.5) / 0.14, 2)));
+        lv = 0.86 * lv + 0.27 * G(); if (R() < 0.011) spike = 2.0 + R() * 3.2; spike *= 0.5;
+        const body = Math.abs(c - o) / Math.max(1e-9, (h - l) || 1), act = 0.4 + 0.7 * Math.min(4, b.vol) + 0.35 * body + (h - l) / Math.max(o, 1) * 380;
+        const volume = Math.max(1, Math.round(sessVolBase * 0.8 * dayLvl * prof * Math.exp(lv) * (1 + spike) * act * Math.exp(G() * 0.3)));
         bars.push({ time: t0 + m * 60, open: o, high: h, low: l, close: c, volume, minuteOfDay: m });
         hh = Math.max(hh, h); ll = Math.min(ll, l); hiPre.push(hh); loPre.push(ll); prevC = c;
       }

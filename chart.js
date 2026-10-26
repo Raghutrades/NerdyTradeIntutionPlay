@@ -51,20 +51,6 @@
       if (N.cfg.magnet && gi < cs.length) { const b = cs[gi]; let best = p, bd = 1e9; [b.open, b.high, b.low, b.close].forEach(v => { const dd = Math.abs(this.yAt(v) - y); if (dd < bd) { bd = dd; best = v; } }); if (bd < 40) p = best; }
       return { t: this.timeAt(gi), p };
     }
-    _dxy(dr) { const xa = this.xAtIdx(this.idxOfTime(dr.a.t)), ya = this.yAt(dr.a.p), xb = this.xAtIdx(this.idxOfTime(dr.b.t)), yb = this.yAt(dr.b.p); return { xa, ya, xb, yb }; }
-    _hitDraw(x, y, touch) {
-      const tol = touch ? 16 : 9, list = (this.d.draws || []).filter(q => !q.hidden && !this.d.hideDraw).reverse();
-      const segD = (px, py, x1, y1, x2, y2, ray) => { const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy || 1; let t = ((px - x1) * dx + (py - y1) * dy) / l2; t = ray ? Math.max(0, t) : Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy)); };
-      for (const dr of list) {
-        const { xa, ya, xb, yb } = this._dxy(dr);
-        if (dr.type !== 'vline') { if (Math.hypot(x - xa, y - ya) <= tol + 4) return { d: dr, part: 'a' }; if (Math.hypot(x - xb, y - yb) <= tol + 4) return { d: dr, part: 'b' }; }
-        if (dr.type === 'trend' || dr.type === 'ray') { if (segD(x, y, xa, ya, xb, yb, dr.type === 'ray') <= tol) return { d: dr, part: 'body' }; }
-        else if (dr.type === 'rect') { if (x >= Math.min(xa, xb) - tol && x <= Math.max(xa, xb) + tol && y >= Math.min(ya, yb) - tol && y <= Math.max(ya, yb) + tol) return { d: dr, part: 'body' }; }
-        else if (dr.type === 'fib') { if (x >= Math.min(xa, xb) - tol && y >= Math.min(ya, yb) - tol && y <= Math.max(ya, yb) + tol) return { d: dr, part: 'body' }; }
-        else if (dr.type === 'vline') { if (Math.abs(x - xa) <= tol) return { d: dr, part: 'body' }; }
-      }
-      return null;
-    }
     clearSticky() { if (this.sticky) { this.sticky = null; this.render(); } }
     idxAtX(x) { return (x - this.pad.left) / this.slot + (this.endFloat - this.count) - 0.5; }
     xAtIdx(i) { return this.pad.left + (i - (this.endFloat - this.count)) * this.slot + this.slot / 2; }
@@ -78,7 +64,7 @@
     _hitDelete(x, y) { for (const p of this._pills) if (p.del && x >= p.dx && x <= p.dx + p.dw && y >= p.y && y <= p.y + p.h) return p.line; return null; }
 
     _bind() {
-      const cv = this.canvas, ptrs = new Map(), DRAWT = ['trend', 'ray', 'rect', 'fib', 'vline'];
+      const cv = this.canvas, ptrs = new Map();
       let pressT = 0, tapOK = false, mode = null, sx = 0, sy = 0, sEnd = 0, bLo = 0, bHi = 1, ppp = 1, bCount = 100, bSlot = 10, pinchD = 0, pinchC = 100, movedY = false;
       cv.addEventListener('wheel', e => {
         e.preventDefault();
@@ -107,14 +93,15 @@
         const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, touch = e.pointerType === 'touch';
         ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (ptrs.size === 1) {
+          if (this._plus && Math.hypot(x - this._plus.x, y - this._plus.y) <= (touch ? 20 : 13)) { mode = 'none'; this.hooks.onOrderPlus && this.hooks.onOrderPlus({ price: this._plus.price, x: e.clientX, y: e.clientY }); return; }
           const del = this._hitDelete(x, y); if (del) { mode = 'none'; this.hooks.onLineDelete && this.hooks.onLineDelete(del); return; }
           const inPlot = x >= this.pad.left && x <= this.W - this.pad.right && y >= this.pad.top && y <= this.pad.top + this.plotH;
           const hit = this._hitLine(x, y, touch);
           if (hit) { mode = 'dragline'; this.draggingLine = hit; this.dragPrice = hit.price; cv.style.cursor = 'ns-resize'; this.hooks.onLineGrab && this.hooks.onLineGrab(hit); this.render(); return; }
-          if (DRAWT.indexOf(this.tool) >= 0 && inPlot) { mode = 'draw'; const a = this._pt(x, y); this.draft = { id: 'draft', type: this.tool, a, b: a, color: N.sty('draw').c, width: N.sty('draw').w }; this.selDraw = null; this.render(); return; }
+          if (N.DRAW[this.tool] && inPlot) { mode = 'draw'; const a = this._pt(x, y); this.draft = this._newDraft(this.tool, a); this.selDraw = null; this.hooks.onSelect && this.hooks.onSelect(null); this.render(); return; }
           if (this.tool === 'cursor' && inPlot) {
             const hd = this._hitDraw(x, y, touch);
-            if (hd) { mode = 'drawdrag'; this.selDraw = hd.d.id; this._dd = { d: hd.d, part: hd.part, x0: x, y0: y, ia: this.idxOfTime(hd.d.a.t), ib: this.idxOfTime(hd.d.b.t), pa: hd.d.a.p, pb: hd.d.b.p }; this.hooks.onSelect && this.hooks.onSelect(hd.d); this.render(); return; }
+            if (hd) { this.selDraw = hd.d.id; this.hooks.onSelect && this.hooks.onSelect(hd.d); if (hd.d.locked || N.cfg.lockDraw) { mode = 'none'; this.render(); return; } mode = 'drawdrag'; this._dd = { d: hd.d, part: hd.part, x0: x, y0: y, s: this._snapDrag(hd.d), moved: false }; this.render(); return; }
             if (this.selDraw) { this.selDraw = null; this.hooks.onSelect && this.hooks.onSelect(null); this.render(); }
           }
           if (this.tool === 'anchor' && inPlot) { mode = 'none'; this.hooks.onAnchor && this.hooks.onAnchor(this.timeAt(Math.max(0, Math.round(this.idxAtX(x))))); return; }
@@ -141,16 +128,13 @@
         const dx = e.clientX - sx, dy = e.clientY - sy;
         if (mode === 'cross') { this.sticky = { x: clamp(x, this.pad.left, this.W - this.pad.right), y: clamp(y, this.pad.top, this.pad.top + this.plotH) }; this.requestRender(); return; }
         if (tapOK && Math.hypot(dx, dy) > 8) { tapOK = false; clearTimeout(pressT); }
-        if (mode === 'draw' && this.draft) { this.draft.b = this._pt(x, y); this.requestRender(); return; }
-        if (mode === 'drawdrag' && this._dd) {
-          const q = this._dd, di = Math.round((x - q.x0) / this.slot), dp = this.priceAtY(y) - this.priceAtY(q.y0), d = q.d;
-          const mv = (i, p) => ({ t: this.timeAt(Math.max(0, i)), p });
-          if (q.part === 'a' || q.part === 'body') d.a = d.type === 'vline' ? mv(q.ia + di, q.pa) : mv(q.ia + di, q.pa + dp);
-          if (q.part === 'b' || q.part === 'body') d.b = mv(q.ib + di, q.pb + dp);
-          if (q.part === 'a' || q.part === 'b') { const pt = this._pt(x, y); if (q.part === 'a') d.a = pt; else d.b = pt; }
-          if (d.type === 'vline') d.b = d.a;
+        if (mode === 'draw' && this.draft) {
+          const dr = this.draft, pt = this._pt(x, y); dr.b = pt;
+          if (dr.type === 'brush') { const l = dr.pts[dr.pts.length - 1]; if (Math.hypot(x - this.xAtIdx(this.idxOfTime(l.t)), y - this.yAt(l.p)) > 3) dr.pts.push(pt); }
+          else if (N.isPosDraw(dr)) this._posFromDrag(dr);
           this.requestRender(); return;
         }
+        if (mode === 'drawdrag' && this._dd) { if (Math.hypot(x - this._dd.x0, y - this._dd.y0) > 2 || this._dd.moved) { this._dd.moved = true; this._applyDrag(this._dd, x, y); this.requestRender(); } return; }
         if (mode === 'dragline') { const p = this.priceAtY(y); this.dragPrice = p; this.hooks.onLineDrag && this.hooks.onLineDrag(this.draggingLine, p); this.render(); return; }
         if (mode === 'measure') { this.measure.b = { i: this.idxAtX(x), p: this.priceAtY(y) }; this.render(); return; }
         if (mode === 'pan') {
@@ -171,8 +155,12 @@
         }
         if (mode === 'measure' && this.measure) { this.measure.done = true; }
         clearTimeout(pressT);
-        if (mode === 'draw' && this.draft) { const dr = this.draft; this.draft = null; const { xa, ya, xb, yb } = this._dxy(dr); if (dr.type === 'vline' || Math.hypot(xb - xa, yb - ya) > 6) { dr.b = dr.type === 'vline' ? dr.a : dr.b; this.hooks.onDrawCommit && this.hooks.onDrawCommit(dr); } this.render(); }
-        if (mode === 'drawdrag') { this._dd = null; this.hooks.onDrawEdit && this.hooks.onDrawEdit(); }
+        if (mode === 'draw' && this.draft) {
+          const dr = this.draft; this.draft = null; const def = N.DRAW[dr.type], g = this._geo(dr), dist = Math.hypot(g.xb - g.xa, g.yb - g.ya);
+          const ok = def.pts === 1 || def.pts === 'pos' || (def.pts === 'free' ? (dr.pts || []).length >= 3 : dist > 6);
+          if (ok) { this._finishDraft(dr); this.hooks.onDrawCommit && this.hooks.onDrawCommit(dr); } this.render();
+        }
+        if (mode === 'drawdrag') { const mv = this._dd && this._dd.moved; this._dd = null; if (mv) this.hooks.onDrawEdit && this.hooks.onDrawEdit(); }
         if (tapOK && mode === 'pan' && e.type === 'pointerup' && N.cfg.showCrosshair) { const r = cv.getBoundingClientRect(); this.sticky = this.sticky ? null : { x: e.clientX - r.left, y: e.clientY - r.top }; this.render(); }
         tapOK = false;
         ptrs.delete(e.pointerId); if (ptrs.size < 2) pinchD = 0; if (ptrs.size === 0) { mode = null; }
@@ -194,7 +182,7 @@
     }
 
     render() {
-      const ctx = this.ctx, c = this.colors, cf = N.cfg, d = this.d, W = this.W, H = this.H, pad = this.pad;
+      const ctx = this.ctx, c = this.colors, cf = N.cfg, d = this.d, W = this.W, H = this.H, pad = this.pad; pad.right = cf.axisW || 66;
       const fs = cf.fontSize || 11, font = (px, w) => (w || '') + ' ' + px + 'px -apple-system,"Segoe UI",Inter,Roboto,system-ui,sans-serif';
       ctx.clearRect(0, 0, W, H); ctx.fillStyle = cf.chartBg || c.bg; ctx.fillRect(0, 0, W, H);
       const cs = d.candles, n = cs.length; this._pills = [];
@@ -203,7 +191,7 @@
       const subH = showSub ? Math.max(60, Math.round(H * 0.2)) : 0, subGap = showSub ? 10 : 0;
       const plotW = Math.max(1, W - pad.left - pad.right), plotH = Math.max(1, H - pad.top - pad.bottom - subH - subGap);
       const subTop = pad.top + plotH + subGap;
-      this.plotW = plotW; this.plotH = plotH;
+      this.plotW = plotW; this.plotH = plotH; this._plus = null;
       const count = clamp(this.viewCount, 12, Math.max(12, n)); this.viewCount = count;
       const liveEnd = d.maxEndFloat + count * cf.rightBars;
       const endFloat = this.followLatest ? liveEnd : clamp(this.viewEndFloat, 8, d.maxEndFloat + count * 0.9);
@@ -234,7 +222,7 @@
 
       // session breaks
       if (cf.showSessionBreaks && N.isIntraday(d.tf)) {
-        ctx.strokeStyle = c.axis; ctx.lineWidth = 1; ctx.setLineDash([2, 4]); ctx.beginPath();
+        const sq = N.sty('sess'); ctx.strokeStyle = sq.c || c.axis; ctx.lineWidth = sq.w || 1; ctx.setLineDash(N.dashOf(sq.d) || []); ctx.beginPath();
         for (let i = 0; i < vis.length; i++) {
           const gi = startIdx + i, prev = i === 0 ? cs[gi - 1] : vis[i - 1];
           if (prev && prev.sessionIndex !== vis[i].sessionIndex) { const x = Math.round(X(gi) - slot / 2) + .5; if (x > pad.left && x < W - pad.right) { ctx.moveTo(x, pad.top); ctx.lineTo(x, subTop + subH); } }
@@ -249,17 +237,18 @@
       ctx.font = font(fs); ctx.textBaseline = 'middle';
       const gm = cf.gridMode, ga = cf.gridAlpha;
       ctx.globalAlpha = ga;
+      const gq = N.sty('grid'), gd = N.dashOf(gq.d) || [];
       if (gm === 'both' || gm === 'h') {
-        ctx.strokeStyle = c.grid; ctx.lineWidth = 1; ctx.beginPath();
+        ctx.strokeStyle = gq.c || c.grid; ctx.lineWidth = gq.w || 1; ctx.setLineDash(gd); ctx.beginPath();
         for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) { const y = Math.round(Y(p)) + .5; ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); }
         ctx.stroke();
       }
       if (gm === 'both' || gm === 'v') {
-        ctx.strokeStyle = c.grid; ctx.lineWidth = 1; ctx.beginPath();
+        ctx.strokeStyle = gq.c || c.grid; ctx.lineWidth = gq.w || 1; ctx.setLineDash(gd); ctx.beginPath();
         for (const L of tl) { const x = Math.round(L.x) + .5; ctx.moveTo(x, pad.top); ctx.lineTo(x, subTop + subH); }
         ctx.stroke();
       }
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = 1; ctx.setLineDash([]);
       ctx.fillStyle = c.dim; ctx.textAlign = 'left';
       for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) { const y = Y(p); if (y > pad.top + 6 && y < pad.top + plotH - 6) ctx.fillText(axTxt(p), W - pad.right + 7, y); }
       // axis line
@@ -361,7 +350,7 @@
       if (last) {
         const prevClose = vis.length > 1 ? vis[vis.length - 2].close : last.open, up = last.close >= prevClose, col = up ? upC : dnC, y = Y(last.close);
         if (y > pad.top - 4 && y < pad.top + plotH + 4) {
-          if (cf.showLastLine) { ctx.strokeStyle = col; ctx.globalAlpha = .7; ctx.setLineDash([2, 3]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.left, Math.round(y) + .5); ctx.lineTo(W - pad.right, Math.round(y) + .5); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+          if (cf.showLastLine) { const lq = N.sty('last'); ctx.strokeStyle = lq.c || col; ctx.globalAlpha = .75; ctx.setLineDash(N.dashOf(lq.d) || []); ctx.lineWidth = lq.w || 1; ctx.beginPath(); ctx.moveTo(pad.left, Math.round(y) + .5); ctx.lineTo(W - pad.right, Math.round(y) + .5); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
           ctx.fillStyle = col; ctx.fillRect(W - pad.right, y - 9, pad.right - 1, 18);
           ctx.fillStyle = '#fff'; ctx.font = font(fs, '700'); ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(last.close.toFixed(2), W - pad.right + 6, y + .5);
           if (cf.showCountdown && d.countdown) {
@@ -380,9 +369,13 @@
       if (cf.showCrosshair && cx0 != null && cx0 >= pad.left && cx0 <= W - pad.right && cy0 <= H - pad.bottom && vis.length) {
         const rawI = Math.round(this.idxAtX(cx0)), gi = Math.max(startIdx, rawI); hIdx = clamp(gi, startIdx, startIdx + vis.length - 1) - startIdx; hb = vis[hIdx];
         const x = Math.round(X(gi)) + .5, hy = clamp(cy0, pad.top, subTop + subH);
-        ctx.strokeStyle = c.cross; ctx.lineWidth = 1; ctx.setLineDash(cf.crosshairStyle === 'solid' ? [] : cf.crosshairStyle === 'dotted' ? [1, 3] : [4, 4]); ctx.globalAlpha = .85;
+        const cq = N.sty('cross'); ctx.strokeStyle = cq.c || c.cross; ctx.lineWidth = cq.w || 1; ctx.setLineDash(cf.crosshairStyle === 'solid' ? [] : cf.crosshairStyle === 'dotted' ? [1, 3] : [4, 4]); ctx.globalAlpha = .85;
         ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, subTop + subH); ctx.moveTo(pad.left, Math.round(hy) + .5); ctx.lineTo(W - pad.right, Math.round(hy) + .5); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
         if (this.sticky) { ctx.fillStyle = c.cross; ctx.beginPath(); ctx.arc(x, hy, 3, 0, 7); ctx.fill(); }
+        if (cf.ui && cf.ui.orderBtn && !this.noPlus && hy >= pad.top + 8 && hy <= pad.top + plotH - 8 && this.tool === 'cursor') {
+          const bx = W - pad.right - 15; this._plus = { x: bx, y: hy, price: this.priceAtY(hy) };
+          ctx.fillStyle = c.tag; ctx.strokeStyle = c.cross; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(bx, hy, 9, 0, 7); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(bx - 4, hy); ctx.lineTo(bx + 4, hy); ctx.moveTo(bx, hy - 4); ctx.lineTo(bx, hy + 4); ctx.stroke();
+        }
         if (hy <= pad.top + plotH) { const pr = this.priceAtY(hy), pt = isPct ? ((pr / pbase - 1) * 100).toFixed(2) + '%' : pr.toFixed(2); ctx.fillStyle = c.tag; ctx.fillRect(W - pad.right, hy - 9, pad.right - 1, 18); ctx.strokeStyle = c.axis; ctx.strokeRect(W - pad.right + .5, hy - 8.5, pad.right - 2, 17); ctx.fillStyle = c.text; ctx.font = font(fs, '600'); ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(pt, W - pad.right + 6, hy + .5); }
         const tlb = N.fmtFull(this.timeAt(gi), d.tf); ctx.font = font(fs, '600'); const tw = ctx.measureText(tlb).width + 14;
         const tx = clamp(x - tw / 2, pad.left, W - pad.right - tw); ctx.fillStyle = c.tag; ctx.fillRect(tx, H - pad.bottom + 1, tw, 18); ctx.strokeStyle = c.axis; ctx.strokeRect(tx + .5, H - pad.bottom + 1.5, tw - 1, 17);
@@ -414,27 +407,6 @@
       }
     }
 
-    _drawOne(ctx, dr, X, Y, slot, W, font, fs, sel) {
-      const pad = this.pad, col = dr.color || '#f59e0b', lw = dr.width || 1.6, xa = X(this.idxOfTime(dr.a.t)), ya = Y(dr.a.p), xb = X(this.idxOfTime(dr.b.t)), yb = Y(dr.b.p), R = W - pad.right;
-      ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.setLineDash([]);
-      if (dr.type === 'trend' || dr.type === 'ray') {
-        let x2 = xb, y2 = yb; if (dr.type === 'ray' && Math.abs(xb - xa) > 0.5) { const k = (yb - ya) / (xb - xa); x2 = xb > xa ? R + 50 : pad.left - 50; y2 = ya + k * (x2 - xa); }
-        ctx.beginPath(); ctx.moveTo(xa, ya); ctx.lineTo(x2, y2); ctx.stroke();
-      } else if (dr.type === 'rect') {
-        ctx.globalAlpha = .14; ctx.fillRect(Math.min(xa, xb), Math.min(ya, yb), Math.abs(xb - xa), Math.abs(yb - ya)); ctx.globalAlpha = 1; ctx.strokeRect(Math.min(xa, xb) + .5, Math.min(ya, yb) + .5, Math.abs(xb - xa), Math.abs(yb - ya));
-      } else if (dr.type === 'vline') {
-        ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(Math.round(xa) + .5, pad.top); ctx.lineTo(Math.round(xa) + .5, pad.top + this.plotH); ctx.stroke(); ctx.setLineDash([]);
-      } else if (dr.type === 'fib') {
-        const L = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1], x0 = Math.min(xa, xb); ctx.font = font(fs - 1, '600'); ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
-        const yv = r => Y(dr.a.p + (dr.b.p - dr.a.p) * r);
-        ctx.globalAlpha = .13; ctx.fillRect(x0, Math.min(yv(.5), yv(.618)), R - x0, Math.abs(yv(.618) - yv(.5))); ctx.globalAlpha = 1;
-        L.forEach(r => { const y = Math.round(yv(r)) + .5; ctx.globalAlpha = r === 0 || r === 1 ? 1 : .7; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(R, y); ctx.stroke(); ctx.globalAlpha = 1; ctx.fillText(r + '  (' + (dr.a.p + (dr.b.p - dr.a.p) * r).toFixed(2) + ')', x0 + 4, y - 2); });
-        ctx.setLineDash([3, 3]); ctx.globalAlpha = .6; ctx.beginPath(); ctx.moveTo(xa, ya); ctx.lineTo(xb, yb); ctx.stroke(); ctx.globalAlpha = 1; ctx.setLineDash([]);
-      }
-      if (sel && dr.type !== 'vline') { ctx.fillStyle = this.colors.bg; [[xa, ya], [xb, yb]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill(); ctx.stroke(); }); }
-      else if (sel) { ctx.fillStyle = this.colors.bg; ctx.beginPath(); ctx.arc(xa, pad.top + 14, 5, 0, 7); ctx.fill(); ctx.stroke(); }
-      ctx.restore();
-    }
     _timeLabels(ctx, cs, n, startIdx, endFloat, count, slot, X, tf, fNorm, fBold, pad, W) {
       const out = [], lo = Math.max(0, Math.floor(endFloat - count) - 1), hi = Math.ceil(endFloat) + 1, minX = pad.left + 14, maxX = W - pad.right - 14;
       const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
