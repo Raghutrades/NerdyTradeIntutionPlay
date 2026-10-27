@@ -202,7 +202,7 @@
       const txt = (dp >= 0 ? '+' : '') + dp.toFixed(2) + ' (' + (dp / dr.a.p * 100).toFixed(2) + '%) · ' + Math.abs(bars) + ' bars' + (N.isIntraday(this.d.tf) ? ' · ' + N.dur(sec) : '');
       ctx.font = font(fs, '700'); const tw = ctx.measureText(txt).width + 16, cx = clamp((xa + xb) / 2 - tw / 2, pad.left + 4, R - tw - 4), cy = clamp(Math.min(ya, yb) - 28, top + 4, bot - 24);
       ctx.fillStyle = c2; rrect(ctx, cx, cy, tw, 22, 5); ctx.fill(); ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(txt, cx + 8, cy + 11.5);
-    } else if (isPos(dr)) this._drawPos(ctx, dr, X, Y, font, fs, xa, ya, xb);
+    } else if (isPos(dr)) this._drawPos(ctx, dr, X, Y, font, fs, xa, ya, xb, sel);
     // selection handles
     if (sel) {
       const g = this._geo(dr), H = this._handles(dr, g); ctx.setLineDash([]); ctx.lineWidth = 1.6; ctx.strokeStyle = col;
@@ -211,7 +211,8 @@
     }
     ctx.restore();
   };
-  C._drawPos = function (ctx, dr, X, Y, font, fs, xa, ya, xbRaw) {
+  C._drawPos = function (ctx, dr, X, Y, font, fs, xa, ya, xbRaw, sel) {
+    const showT = !!(sel || dr.forceLabels);
     const long = dr.type === 'longpos', ytp = Y(dr.tp), ysl = Y(dr.sl), x0 = xa, x1 = Math.max(xbRaw, xa + 24), tpS = N.sty('posTp').c, slS = N.sty('posSl').c;
     const qty = dr.qty || 1, risk = Math.abs(dr.a.p - dr.sl), rew = Math.abs(dr.tp - dr.a.p), rr = risk > 0 ? rew / risk : 0, ep = dr.a.p;
     ctx.setLineDash([]); ctx.globalAlpha = .2; ctx.fillStyle = tpS; ctx.fillRect(x0, Math.min(ya, ytp), x1 - x0, Math.abs(ytp - ya)); ctx.fillStyle = slS; ctx.fillRect(x0, Math.min(ya, ysl), x1 - x0, Math.abs(ysl - ya)); ctx.globalAlpha = 1;
@@ -221,14 +222,14 @@
     ctx.font = font(fs - 1, '700'); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     const pc = v => (v / ep * 100).toFixed(2) + '%', tpTxt = 'Target ' + dr.tp.toFixed(2) + '  (' + pc(rew) + ')  ' + N.sgnInr(rew * qty, 0), slTxt = 'Stop ' + dr.sl.toFixed(2) + '  (' + pc(risk) + ')  ' + N.sgnInr(-risk * qty, 0);
     const lab = (txt, yEdge, towardsInside, c) => { const w = ctx.measureText(txt).width; if (x1 - x0 < w + 14 && x1 - x0 < 60) return; ctx.fillStyle = c; ctx.fillText(txt, x0 + 7, yEdge + towardsInside * 10); };
-    lab(tpTxt, ytp, ytp < ya ? 1 : -1, tpS); lab(slTxt, ysl, ysl < ya ? 1 : -1, slS);
+    if (showT) { lab(tpTxt, ytp, ytp < ya ? 1 : -1, tpS); lab(slTxt, ysl, ysl < ya ? 1 : -1, slS); }
     const { res, ia, last } = this._posOutcome(dr);
     // centre pill on the entry line
     let mid = 'R:R ' + rr.toFixed(2) + '  ·  Qty ' + qty; const cs = this.d.candles;
     if (res) mid += res.k === 'TP' ? '  ·  ✔ TARGET HIT' : '  ·  ✖ STOP HIT';
     else if (last > ia && cs[last]) { const pnl = (cs[last].close - ep) * (long ? 1 : -1) * qty; mid += '  ·  P&L ' + N.sgnInr(pnl, 0) + ' (' + ((cs[last].close - ep) * (long ? 1 : -1) / (risk || 1)).toFixed(1) + 'R)'; }
     ctx.font = font(fs, '700'); const tw = ctx.measureText(mid).width + 16, px = clamp(x0 + (x1 - x0) / 2 - tw / 2, this.pad.left + 2, this.W - this.pad.right - tw - 2);
-    ctx.fillStyle = res ? (res.k === 'TP' ? tpS : slS) : 'rgba(30,34,45,.92)'; rrect(ctx, px, ya - 10, tw, 20, 5); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(mid, px + 8, ya + .5);
+    if (showT) { ctx.fillStyle = res ? (res.k === 'TP' ? tpS : slS) : 'rgba(30,34,45,.92)'; rrect(ctx, px, ya - 10, tw, 20, 5); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(mid, px + 8, ya + .5); }
     if (res) { const hx = X(res.i); ctx.strokeStyle = res.k === 'TP' ? tpS : slS; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(hx, Math.min(ya, ytp, ysl) - 2); ctx.lineTo(hx, Math.max(ya, ytp, ysl) + 2); ctx.stroke(); ctx.fillStyle = res.k === 'TP' ? tpS : slS; ctx.beginPath(); ctx.arc(hx, res.k === 'TP' ? ytp : ysl, 4.5, 0, 7); ctx.fill(); }
   };
 })(window.NTI);

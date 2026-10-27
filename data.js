@@ -64,12 +64,12 @@
     return bars;
   }
 
-  M.generate = function (seed) {
+  M.generate = function (seed, opts) {
     seed = seed || (1 + Math.floor(Math.random() * 899999));
     const R = mulberry32(seed * 2654435761 >>> 0), G = gaussFrom(R);
-    M.seed = seed; M.ticker = STOCKS[Math.floor(R() * STOCKS.length)];
+    M.seed = seed; M.ticker = STOCKS[Math.floor(R() * STOCKS.length)]; M.opts = opts && opts.sym ? { sym: opts.sym, px: opts.px } : null; if (M.opts) M.ticker = M.opts.sym;
     M.aggCache = {}; M.pathCache = new Map();
-    let price = Math.floor(R() * 3800) + 200;
+    let price = Math.floor(R() * 3800) + 200; if (M.opts && M.opts.px > 0) price = M.opts.px;
     let ms = Date.UTC(2023, 0, 2) + Math.floor(R() * 300) * 86400000;
     const nextBiz = () => { ms += 86400000; let d = new Date(ms).getUTCDay(); while (d === 0 || d === 6) { ms += 86400000; d = new Date(ms).getUTCDay(); } };
     { let d = new Date(ms).getUTCDay(); while (d === 0 || d === 6) { ms += 86400000; d = new Date(ms).getUTCDay(); } }

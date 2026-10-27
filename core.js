@@ -49,7 +49,7 @@ window.NTI = window.NTI || {};
     pk2: { ema: false, e13: true, e21: true, e50: true, e200: true, vwap: false, vWk: true, vMo: false, vPd: false, av: false, avDays: 5, b1: true, b2: true, b3: false, adx: false, vb: false, vbPreset: 'Strict', vbLines: true, vbMa: true, labels: false },
     lv: { pd: { hl: false, fib: false }, pw: { hl: false, fib: false }, pm: { hl: false, fib: false }, dayo: false, dayhl: false, orb: false },
     naked: false, plan: true, side: true, panelW: 360, tab: 'trade', favTfs: [1, 5, 15, 60, 'D'],
-    sty: {}, hidden: {}, ui: { dock: true, replay: true, pills: true, jump: true, lines: true, strip: true, selbar: true, orderBtn: true, quote: true }, dockPos: null, replayPos: null, magnet: false, hideDraw: false, brand: 'NerdyTrade', brandPulse: true,
+    sty: {}, hidden: {}, favTools: ['trend', 'fib', 'rect', 'longpos', 'shortpos', 'text'], favPos: null, ui: { favbar: true, dock: true, replay: true, pills: true, jump: true, lines: true, strip: true, selbar: true, orderBtn: true, quote: true }, dockPos: null, replayPos: null, magnet: false, hideDraw: false, brand: 'NerdyTrade', brandPulse: true,
     axisW: 66, quoteSec: 5, splashSec: 3.4, blowPct: 25, stripSize: 12, lockDraw: false, stayDraw: false, volAlpha: 0.5
   };
   /* ---------- themes ---------- */
@@ -325,7 +325,9 @@ window.NTI = window.NTI || {};
       if (it.swatch) h += '<span class="sw" style="background:' + it.swatch + '"></span>';
       h += '<span class="grow">' + N.esc(it.label) + '</span>';
       if (it.kbd) h += '<span class="kbd">' + N.esc(it.kbd) + '</span>';
+      if (it.star !== undefined) h += '<span class="mstar' + (it.star ? ' on' : '') + '" title="' + (it.star ? 'Remove from favorites' : 'Add to favorites') + '">' + (it.star ? '★' : '☆') + '</span>';
       b.innerHTML = h;
+      if (it.star !== undefined) { const st = b.querySelector('.mstar'); st.onclick = e => { e.stopPropagation(); it.starFn && it.starFn(); N.sfx.click(); renderMenu(); }; }
       b.onclick = e => { e.stopPropagation(); it.fn && it.fn(); N.sfx.click(); if (it.keep) renderMenu(); else closeMenu(); };
       menuEl.appendChild(b);
     });

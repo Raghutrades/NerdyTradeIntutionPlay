@@ -103,7 +103,7 @@
       add(range('levelWidth', 'Level line width', 0.6, 3, 0.1, v => v.toFixed(1)));
       add(tog('levelLabels', 'Level labels (PDH, PWL…)'));
       add(sect('Floating controls — drag the ⋮⋮ grip on the dock / replay strip to place them anywhere'));
-      [['dock', 'Order dock (qty · SL · TP · buy · sell)'], ['replay', 'Replay strip'], ['pills', 'TP / SL pills on the chart'], ['lines', 'TP / SL / plan lines on the chart'], ['jump', '“Jump to live” button'], ['strip', 'Date & quote strip (top)'], ['orderBtn', '＋ order button on the price axis'], ['selbar', 'Drawing toolbar (colour · width · lock · delete)']].forEach(([k, n]) => { const l = document.createElement('label'); l.className = 'tog'; l.innerHTML = '<input type="checkbox"><i></i>'; const i = l.firstChild; i.checked = !!N.cfg.ui[k]; i.onchange = () => { N.cfg.ui[k] = i.checked; N.saveCfg(); N.cfgChanged('ui'); }; add(row(n, null, l)); });
+      [['dock', 'Order dock (qty · SL · TP · buy · sell)'], ['replay', 'Replay strip'], ['pills', 'TP / SL pills on the chart'], ['lines', 'TP / SL / plan lines on the chart'], ['jump', '“Jump to live” button'], ['favbar', 'Favorite drawing tools bar'], ['strip', 'Date & quote strip (top)'], ['orderBtn', '＋ order button on the price axis'], ['selbar', 'Drawing toolbar (colour · width · lock · delete)']].forEach(([k, n]) => { const l = document.createElement('label'); l.className = 'tog'; l.innerHTML = '<input type="checkbox"><i></i>'; const i = l.firstChild; i.checked = !!N.cfg.ui[k]; i.onchange = () => { N.cfg.ui[k] = i.checked; N.saveCfg(); N.cfgChanged('ui'); }; add(row(n, null, l)); });
       add(btn('Reset floating panel positions', 'restart', () => N.resetFloatPos()));
       add(sect('Top strip & splash'));
       add(range('quoteSec', 'New quote every', 2, 20, 1, v => v + ' s'));
@@ -119,7 +119,7 @@
     } else if (cur === 'trade') {
       add(sect('Costs & capital'));
       add(sel('segment', 'Charge segment', [['intraday', 'Equity intraday'], ['delivery', 'Delivery'], ['futures', 'Futures'], ['options', 'Options']], 'Charges are deducted from every logged trade'));
-      add(num('capital', 'Default capital (₹)', 1000, 1000, 'Used for a brand-new account and as the default top-up'));
+      { const i = document.createElement('input'); i.type = 'number'; i.min = 100; i.step = 1000; i.value = (N.ledger && N.ledger.list.find(x => x.type === 'start') || { amount: N.cfg.capital }).amount; i.onchange = () => { const v = parseFloat(i.value); if (!(v >= 100 && N.setStartCapital(v))) { i.value = N.cfg.capital; N.toast('Enter at least ₹100', 'error'); } }; add(row('Starting / default capital (₹)', 'Re-bases your account balance, ROI and drawdown %. Also the default for top-ups', i)); }
       add(num('blowPct', 'Blow-up level (% of capital)', 0, 5, 'Account counts as blown at or below this share of the capital you put in'));
       const cw = document.createElement('div'); cw.className = 'btnrow'; cw.appendChild(btn('Add capital', 'plus', () => { N.closeModal(); N.capitalAction('deposit'); })); cw.appendChild(btn('Withdraw', 'minus', () => { N.closeModal(); N.capitalAction('withdraw'); })); cw.appendChild(btn('Open dashboard', 'dashb', () => { N.closeModal(); N.openDash('account'); })); add(cw);
       add(sect('Order ticket defaults (for each new chart)'));

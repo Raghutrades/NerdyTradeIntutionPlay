@@ -125,18 +125,31 @@
     S.tool = t; chart.setTool(t);
     $('toolCursor').classList.toggle('on', t === 'cursor'); $('toolDraw').classList.toggle('on', isDrawTool(t)); $('toolAnchor').classList.toggle('on', t === 'anchor');
     if (DRAWT[t]) N.setIcon($('toolDrawIc'), DRAWT[t].ic); else if (t === 'cursor') N.setIcon($('toolDrawIc'), 'pencil');
+    if (typeof renderFav === 'function' && $('favBar').firstChild) $('favBar').querySelectorAll('[data-fav]').forEach(b => b.classList.toggle('on', b.dataset.fav === t));
   }
   function clearDrawings() { S.userLines = []; S.draws = []; chart.measure = null; chart.selDraw = null; histSnap(); refresh(); renderObjects(); renderSelBar(); }
   function syncRail() {
     const c = C(); $('railGrid').classList.toggle('on', c.gridMode !== 'none'); $('railBreaks').classList.toggle('on', c.showSessionBreaks); $('railCross').classList.toggle('on', c.showCrosshair);
     $('toolMagnet').classList.toggle('on', c.magnet); $('toolHideDraw').classList.toggle('on', c.hideDraw); N.setIcon($('toolHideDrawIc'), c.hideDraw ? 'eyeoff' : 'eye'); applyUi();
   }
+  /* ---------- favourite drawing tools: star them in the menu, they appear in a draggable bar ---------- */
+  const isFav = k => (C().favTools || []).includes(k);
+  function toggleFav(k) { const l = C().favTools = (C().favTools || []).slice(); const i = l.indexOf(k); if (i >= 0) l.splice(i, 1); else l.push(k); N.saveCfg(); renderFav(); }
+  const FAVN = { hline: ['Horizontal line', 'hline'], measure: ['Measure', 'ruler'] };
+  function renderFav() {
+    const el = $('favBar'), l = (C().favTools || []).filter(k => DRAWT[k] || FAVN[k]), on = C().ui.favbar !== false;
+    el.classList.toggle('show', on); if (!on) return;
+    el.innerHTML = '<span class="grip" id="favGrip" title="Drag to move · double-click to reset">' + N.icon('gripd', 14) + '</span>' + l.map(k => { const nm = DRAWT[k] ? [DRAWT[k].n, DRAWT[k].ic] : FAVN[k]; return '<button class="btn icon sm' + (S.tool === k ? ' on' : '') + '" data-fav="' + k + '" title="' + N.esc(nm[0]) + '">' + N.icon(nm[1], 18) + '</button>'; }).join('') + '<button class="btn icon sm" data-fav="_menu" title="All drawing tools · tap ☆ to favorite">' + N.icon('plus', 16) + '</button><button class="btn icon sm" data-fav="_x" title="Hide this bar (Settings → Floating panels)">' + N.icon('x', 14) + '</button>';
+    el.querySelectorAll('[data-fav]').forEach(b => b.onclick = e => { const k = b.dataset.fav; N.sfx.click(); if (k === '_menu') { N.openMenu(b, drawMenu, 'left'); return; } if (k === '_x') { C().ui.favbar = false; N.saveCfg(); renderFav(); return; } setTool(S.tool === k ? 'cursor' : k); if (S.tool === k) N.toast((DRAWT[k] ? DRAWT[k].n : FAVN[k][0]) + ' — ' + (DRAWT[k] && DRAWT[k].pts === 1 || k === 'hline' ? 'tap the chart' : 'drag on the chart'), 'info'); });
+    if (makeDragFav) makeDragFav(); applyPos(el, 'favPos');
+  }
+  let makeDragFav = null;
   const drawMenu = () => {
     const it = []; let g = '';
     Object.keys(DRAWT).forEach(k => {
       const d = DRAWT[k];
-      if (d.g !== g) { g = d.g; it.push({ h: g }); if (g === 'Lines') it.push({ label: 'Horizontal line', icon: 'hline', on: S.tool === 'hline', kbd: 'L', fn: () => setTool(S.tool === 'hline' ? 'cursor' : 'hline') }); }
-      it.push({ label: d.n, icon: d.ic, on: S.tool === k, fn: () => { setTool(S.tool === k ? 'cursor' : k); if (S.tool === k) N.toast(d.n + (d.pts === 'pos' ? ': tap the chart, or drag to set the target' : d.pts === 1 ? ': tap the chart' : d.pts === 'free' ? ': draw with your finger' : ': drag on the chart'), 'info'); } });
+      if (d.g !== g) { g = d.g; it.push({ h: g }); if (g === 'Lines') it.push({ label: 'Horizontal line', icon: 'hline', star: isFav('hline'), starFn: () => toggleFav('hline'), on: S.tool === 'hline', kbd: 'L', fn: () => setTool(S.tool === 'hline' ? 'cursor' : 'hline') }); }
+      it.push({ label: d.n, icon: d.ic, star: isFav(k), starFn: () => toggleFav(k), on: S.tool === k, fn: () => { setTool(S.tool === k ? 'cursor' : k); if (S.tool === k) N.toast(d.n + (d.pts === 'pos' ? ': tap the chart, or drag to set the target' : d.pts === 1 ? ': tap the chart' : d.pts === 'free' ? ': draw with your finger' : ': drag on the chart'), 'info'); } });
     });
     return it.concat([{ label: 'Measure', icon: 'ruler', on: S.tool === 'measure', kbd: 'M', fn: () => setTool(S.tool === 'measure' ? 'cursor' : 'measure') },
       { h: 'Options' }, { label: 'Magnet (snap to OHLC)', check: 1, on: C().magnet, keep: 1, fn: () => { C().magnet = !C().magnet; N.saveCfg(); syncRail(); } },
@@ -155,7 +168,7 @@
   $('railCross').onclick = () => { C().showCrosshair = !C().showCrosshair; if (!C().showCrosshair) chart.sticky = null; N.saveCfg(); syncRail(); chart.render(); };
   /* floating controls (order dock, replay strip, TP/SL pills, jump-to-live) */
   function applyUi() {
-    const u = C().ui; $('dock').classList.toggle('ui-off', !u.dock); $('replayBar').classList.toggle('ui-off', !u.replay); $('jumpLive').classList.toggle('ui-off', !u.jump); $('strip').classList.toggle('ui-off', !u.strip); document.body.classList.toggle('nostrip', !u.strip);
+    const u = C().ui; if (u.favbar === undefined) u.favbar = true; if (typeof renderFav === 'function') renderFav(); $('dock').classList.toggle('ui-off', !u.dock); $('replayBar').classList.toggle('ui-off', !u.replay); $('jumpLive').classList.toggle('ui-off', !u.jump); $('strip').classList.toggle('ui-off', !u.strip); document.body.classList.toggle('nostrip', !u.strip);
     const anyOff = !(u.dock && u.replay && u.pills && u.jump && u.lines); $('railFloat').classList.toggle('on', anyOff); $('floatRestore').classList.toggle('show', anyOff);
     chart.hidePills = !u.pills; chart.requestRender(); requestAnimationFrame(() => { applyFloatPos(); chart.resize(); });
   }
@@ -352,14 +365,14 @@
     N.sfx.unlock();
     const qty = Math.max(1, o.qty || parseInt($('sideQty').value) || 1), tp = o.tpPts != null ? o.tpPts : ptsOf('sideTp'), sl = o.slPts != null ? o.slPts : ptsOf('sideSl'), slip = C().slipTicks * TICK;
     const entry = o.entry != null ? o.entry : r2(M.priceAt(S.sec) + dir * slip), ck = M.clock(S.sec);
-    S.pos = { dir, entry, qty, tp: r2(entry + dir * tp), sl: r2(entry - dir * sl), tp0: r2(entry + dir * tp), sl0: r2(entry - dir * sl), risk: sl, openSec: S.sec, openClock: N.fmtHM(ck.time), mfe: 0, mae: 0, ext: entry, trail: { on: false, pts: C().trailPts > 0 ? C().trailPts : sl }, trailed: false, seg: C().segment, seed: M.seed, tf: C().tf, sym: M.ticker };
+    S.pos = { dir, entry, qty, tp: r2(entry + dir * tp), sl: r2(entry - dir * sl), tp0: r2(entry + dir * tp), sl0: r2(entry - dir * sl), risk: sl, openSec: S.sec, openClock: N.fmtHM(ck.time), gopt: M.opts, mfe: 0, mae: 0, ext: entry, trail: { on: false, pts: C().trailPts > 0 ? C().trailPts : sl }, trailed: false, seg: C().segment, seed: M.seed, tf: C().tf, sym: M.ticker };
     S.plan.dir = dir; dir === 1 ? N.sfx.buy() : N.sfx.sell();
     if (!o.entry) N.toast((dir === 1 ? 'Bought ' : 'Sold ') + qty + ' @ ₹' + entry.toFixed(2), 'info'); refresh(); renderPanels(true);
   }
   function closePos(price, reason) {
     const P = S.pos; if (!P) return; S.pos = null;
     const gross = (price - P.entry) * P.dir * P.qty, ch = N.tradeCharges(P.dir, P.entry, price, P.qty, P.seg).total, net = gross - ch, risk = P.risk > 0 ? P.risk : null;
-    const t = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), ts: Date.now(), sym: P.sym, seed: P.seed, tf: P.tf, dir: P.dir, entry: P.entry, exit: r2(price), qty: P.qty, gross: r2(gross), charges: r2(ch), net: r2(net), reason, risk, r: risk ? r2(net / (risk * P.qty)) : null, mfe: r2(P.mfe), mae: r2(P.mae), t0: P.openSec, t1: S.sec, dur: Math.round(S.sec - P.openSec), clock: P.openClock, tag: '', note: '', seg: P.seg, tp0: P.tp0, sl0: P.sl0 };
+    const t = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), ts: Date.now(), sym: P.sym, seed: P.seed, tf: P.tf, dir: P.dir, entry: P.entry, exit: r2(price), qty: P.qty, gross: r2(gross), charges: r2(ch), net: r2(net), reason, risk, r: risk ? r2(net / (risk * P.qty)) : null, mfe: r2(P.mfe), mae: r2(P.mae), t0: P.openSec, t1: S.sec, dur: Math.round(S.sec - P.openSec), clock: P.openClock, tag: '', note: '', seg: P.seg, tp0: P.tp0, sl0: P.sl0, gopt: P.gopt || null };
     N.tradeStore.add(t);
     if (reason === 'TP') N.sfx.tp(); else if (reason === 'SL') (net >= 0 ? N.sfx.win() : N.sfx.sl()); else (net >= 0 ? N.sfx.win() : N.sfx.loss());
     N.toast(reason + ' · ' + N.sgnInr(net, 2) + ' (' + (t.r != null ? t.r.toFixed(2) + 'R' : '—') + ')', net >= 0 ? 'win' : 'loss');
@@ -459,7 +472,9 @@
   let ordState = null;
   function openOrderPop(price, cx, cy) {
     const cur = S.price, dir = price < cur ? 1 : -1, pop = $('ordPop');
-    ordState = { dir, price: r2(snap(price)), type: 'limit', qty: Math.max(1, parseInt($('sideQty').value) || 1), tp: ptsOf('sideTp'), sl: ptsOf('sideSl') }; autoType(); renderOrderPop();
+    ordState = { dir, price: r2(snap(price)), type: 'limit', qty: Math.max(1, parseInt($('sideQty').value) || 1), tp: ptsOf('sideTp'), sl: ptsOf('sideSl') }; autoType();
+    { const ul = { id: 'u' + (S.uid++), price: ordState.price }; S.userLines.push(ul); ordState.lineId = ul.id; histSnap(); refresh(); }
+    renderOrderPop();
     pop.classList.add('show'); const w = pop.offsetWidth, h = pop.offsetHeight, wr = $('chartwrap').getBoundingClientRect();
     pop.style.left = N.clamp(cx - wr.left - w - 18, 8, wr.width - w - 8) + 'px'; pop.style.top = N.clamp(cy - wr.top - h / 2, 8, wr.height - h - 8) + 'px';
   }
@@ -483,11 +498,14 @@
     if (a === 'place') {
       if (o.type === 'market') { if (S.pos) { N.toast('Close your open position first', 'info'); N.sfx.error(); return; } openPos(o.dir, { qty: o.qty, tpPts: o.tp, slPts: o.sl }); }
       else { S.orders.push({ id: 'o' + (S.uid++), dir: o.dir, type: o.type, price: o.price, qty: o.qty, tpPts: o.tp, slPts: o.sl }); N.sfx.drop(); N.toast((o.dir === 1 ? 'BUY ' : 'SELL ') + o.type.toUpperCase() + ' placed @ ₹' + o.price.toFixed(2) + ' — drag its line to move, ✕ to cancel', 'info'); }
+      if (o.lineId) { S.userLines = S.userLines.filter(u => u.id !== o.lineId); histSnap(); o.lineId = null; }
       $('ordPop').classList.remove('show'); refresh(); renderPanels(true);
     }
   });
-  $('ordPop').addEventListener('change', e => { const a = e.target.dataset.o, o = ordState; if (!a || !o) return; const v = parseFloat(e.target.value); if (a === 'price' && v > 0) { o.price = r2(v); autoType(); } else if (a === 'qty') o.qty = Math.max(1, parseInt(e.target.value) || 1); else if ((a === 'tp' || a === 'sl') && v > 0) o[a] = v; renderOrderPop(); });
-  document.addEventListener('pointerdown', e => { const p = $('ordPop'); if (p.classList.contains('show') && !p.contains(e.target)) p.classList.remove('show'); }, true);
+  $('ordPop').addEventListener('change', e => { const a = e.target.dataset.o, o = ordState; if (!a || !o) return; const v = parseFloat(e.target.value); if (a === 'price' && v > 0) { o.price = r2(v); autoType(); const ul = o.lineId && S.userLines.find(u => u.id === o.lineId); if (ul) { ul.price = o.price; refresh(); } } else if (a === 'qty') o.qty = Math.max(1, parseInt(e.target.value) || 1); else if ((a === 'tp' || a === 'sl') && v > 0) o[a] = v; renderOrderPop(); });
+  document.addEventListener('pointerdown', e => { const p = $('ordPop'); if (!p.classList.contains('show') || p.contains(e.target)) return;
+    if (e.target === $('chartCanvas') && ordState && ordState.lineId) { const ul = S.userLines.find(u => u.id === ordState.lineId), r = $('chartCanvas').getBoundingClientRect(); if (ul && Math.abs(chart.yAt(ul.price) - (e.clientY - r.top)) < 14 && e.clientX - r.left < r.width - 60) return; }
+    p.classList.remove('show'); }, true);
 
   chart.hooks = {
     onFollow: f => $('jumpLive').classList.toggle('show', !f && C().ui.jump),
@@ -498,13 +516,13 @@
       else if (l.id === 'sl' && P) P.sl = r2(validSL(P, price, S.price));
       else if (l.id === 'plan-tp') { $('sideTp').value = Math.max(0.05, r2(Math.abs(price - S.price))).toFixed(2); }
       else if (l.id === 'plan-sl') { $('sideSl').value = Math.max(0.05, r2(Math.abs(price - S.price))).toFixed(2); }
-      else if (l.kind === 'user') { const u = S.userLines.find(x => x.id === l.id); if (u) u.price = price; histSnap(); }
+      else if (l.kind === 'user') { const u = S.userLines.find(x => x.id === l.id); if (u) u.price = price; histSnap(); if (ordState && ordState.lineId === l.id && $('ordPop').classList.contains('show')) { ordState.price = r2(price); autoType(); renderOrderPop(); } }
       else if (l.kind === 'order') { const o = S.orders.find(x => 'ord:' + x.id === l.id); if (o) o.price = price; }
       N.sfx.drop(); refresh(); renderPanels(true);
     },
     posDefaults: dr => { const long = dr.type === 'longpos', tp = ptsOf('sideTp'), sl = ptsOf('sideSl'); dr.tp = r2(dr.a.p + (long ? tp : -tp)); dr.sl = r2(dr.a.p - (long ? sl : -sl)); dr.b = { t: chart.timeAt(chart.idxOfTime(dr.a.t) + 24), p: dr.a.p }; },
     onDrawCommit: dr => {
-      if (dr.type === 'text') { const t = prompt('Text note', ''); if (!t) { chart.render(); return; } dr.text = t; }
+      if (dr.type === 'text' || dr.type === 'callout') { const t = prompt(dr.type === 'text' ? 'Text note' : 'Callout text', ''); if (!t) { chart.render(); return; } dr.text = t; }
       if (N.isPosDraw(dr)) dr.qty = Math.max(1, parseInt($('sideQty').value) || 1);
       dr.id = 'd' + (S.uid++); S.draws.push(dr); chart.selDraw = dr.id; if (!C().stayDraw) setTool('cursor'); N.sfx.drop(); histSnap(); refresh(); renderObjects(); renderSelBar();
     },
@@ -527,9 +545,9 @@
     grip.addEventListener('pointerup', end); grip.addEventListener('pointercancel', end);
     grip.addEventListener('dblclick', () => { C()[key] = null; N.saveCfg(); applyPos(el, key); });
   }
-  function applyFloatPos() { applyPos($('dock'), 'dockPos'); applyPos($('replayBar'), 'replayPos'); }
-  N.resetFloatPos = () => { C().dockPos = C().replayPos = null; N.saveCfg(); applyFloatPos(); N.toast('Floating panels moved back to their default spots', 'info'); };
-  makeDraggable($('dock'), $('dockGrip'), 'dockPos'); makeDraggable($('replayBar'), $('rpGrip'), 'replayPos');
+  function applyFloatPos() { applyPos($('dock'), 'dockPos'); applyPos($('replayBar'), 'replayPos'); applyPos($('favBar'), 'favPos'); }
+  N.resetFloatPos = () => { C().dockPos = C().replayPos = C().favPos = null; N.saveCfg(); applyFloatPos(); N.toast('Floating panels moved back to their default spots', 'info'); };
+  makeDraggable($('dock'), $('dockGrip'), 'dockPos'); makeDraggable($('replayBar'), $('rpGrip'), 'replayPos'); makeDragFav = () => { const g = $('favGrip'); if (g && !g._d) { g._d = 1; makeDraggable($('favBar'), g, 'favPos'); } }; renderFav();
 
   /* ---------- date strip + rotating quotes ---------- */
   let qIdx = -1, qTimer = 0;
@@ -594,17 +612,32 @@
 
   /* ======================= loading charts ======================= */
   function setPlanDefaults(p) { $('sideTp').value = Math.max(0.1, N.roundTick(p * C().defTpPct / 100)).toFixed(2); $('sideSl').value = Math.max(0.1, N.roundTick(p * C().defSlPct / 100)).toFixed(2); }
-  function loadSeed(seed, startSec, paused) {
+  function loadSeed(seed, startSec, paused, opts) {
     pause(); if (S.pos) closeMarket('NEXT');
-    M.generate(seed); M.setDensity(C().tickDensity);
+    if (!opts && !seed && N.FNO) { const r = N.FNO[Math.floor(Math.random() * N.FNO.length)]; opts = { sym: r[0], px: r[1], fit: true }; }
+    if (opts && opts.fit) { // first pass measures where the synthetic history lands, second pass re-scales so the replay opens at (about) the real LTP
+      seed = seed || 1 + Math.floor(Math.random() * 899999); M.generate(seed, opts); const last = M.priceAt(M.startSec);
+      opts = { sym: opts.sym, px: Math.max(0.5, Math.round(opts.px * opts.px / last * 20) / 20) };
+    }
+    M.generate(seed, opts); M.setDensity(C().tickDensity);
     S.sec = startSec != null ? startSec : M.startSec; S.ic = {}; S.userLines = []; S.draws = []; S.orders = []; chart.selDraw = null; histReset(); renderSelBar(); S.lastKey = ''; chart.measure = null;
     const p = M.priceAt(S.sec); S.price = p; setPlanDefaults(p); N.rcSetEntry(p);
     chart.resetView(); refreshHeader(); refresh(); renderPanels(true);
     if (!paused) play();
   }
-  N.loadSeed = (seed) => loadSeed(seed);
+  N.loadSeed = (seed, startSec, paused, opts) => loadSeed(seed, startSec, paused, opts);
   function newChart() { loadSeed(0); N.sfx.click(); }
-  N.reviewTrade = t => { if (!t.seed) return; const start = Math.max(0, (t.t0 != null ? t.t0 : M.startSec) - 2400); loadSeed(t.seed, start, true); if (mobile()) closeSide(); N.toast('Reviewing ' + t.sym + ' — chart paused 40 min before entry', 'info'); };
+  N.reviewTrade = t => {
+    if (!t.seed) return; const start = Math.max(0, (t.t0 != null ? t.t0 : M.startSec) - 900); loadSeed(t.seed, start, true, t.gopt || undefined);
+    if (t.t0 != null) {
+      const eT = M.clock(t.t0).time, xT = M.clock(t.t1 != null ? t.t1 : t.t0).time, win = t.net >= 0, risk = t.risk > 0 ? t.risk : Math.abs(t.entry - t.exit) || t.entry * 0.005;
+      S.draws.push({ id: 'd' + (S.uid++), type: t.dir === 1 ? 'longpos' : 'shortpos', a: { t: eT, p: t.entry }, b: { t: xT, p: t.entry }, tp: t.tp0 != null ? t.tp0 : t.entry + t.dir * risk * 2, sl: t.sl0 != null ? t.sl0 : t.entry - t.dir * risk, qty: t.qty, color: '#94a3b8', width: 1.3, forceLabels: true },
+        { id: 'd' + (S.uid++), type: t.dir === 1 ? 'mkup' : 'mkdn', a: { t: eT, p: t.entry }, b: { t: eT, p: t.entry }, color: t.dir === 1 ? '#26a69a' : '#ef5350', text: 'IN', width: 1.2 },
+        { id: 'd' + (S.uid++), type: t.dir === 1 ? 'mkdn' : 'mkup', a: { t: xT, p: t.exit }, b: { t: xT, p: t.exit }, color: win ? '#22c55e' : '#f97316', text: 'OUT ' + (t.reason || ''), width: 1.2 });
+      histReset(); refresh(); renderObjects();
+    }
+    if (S.speed < 10) setSpeed(10); play(); if (mobile()) closeSide(); N.toast('Replaying ' + t.sym + ' from 15 min before your entry — ' + S.speed + '× speed (change it on the replay bar)', 'info');
+  };
 
   /* ======================= quantity / ticket wiring ======================= */
   function syncQty(from) { const v = Math.max(1, parseInt($(from).value) || 1); $('sideQty').value = v; $('dockQty').value = v; }
@@ -621,9 +654,10 @@
   function setTab(t) {
     C().tab = t; N.saveCfg();
     document.querySelectorAll('.stab').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); document.querySelectorAll('.tp').forEach(p => p.classList.toggle('on', p.id === 'tab-' + t));
-    if (t === 'stats') N.renderStats(); if (t === 'journal') N.renderJournal();
+    if (t === 'stats') N.renderStats(); if (t === 'journal') N.renderJournal(); if (t === 'watch') N.watch.onTab();
   }
   document.querySelectorAll('.stab').forEach(b => b.onclick = () => { N.sfx.click(); setTab(b.dataset.tab); });
+  $('sym').style.cursor = 'pointer'; $('sym').title = 'Search / change symbol (watchlist)'; $('sym').onclick = () => { if (mobile()) $('side').classList.add('mob-open'); setTab('watch'); setTimeout(() => { const q = document.getElementById('wlQ'); q && q.focus(); }, 60); };
   function closeSide() { $('side').classList.remove('mob-open'); }
   function toggleSide() {
     if (mobile()) { $('side').classList.toggle('mob-open'); if ($('side').classList.contains('mob-open')) setTab(C().tab); }
@@ -713,6 +747,37 @@
     document.querySelectorAll('#stRanges button').forEach(b => b.classList.toggle('on', b.dataset.r === key)); setTimeout(() => document.querySelectorAll('#stRanges button').forEach(b => b.classList.remove('on')), 900);
   }
   document.querySelectorAll('#stRanges button').forEach(b => b.onclick = () => setRange(b.dataset.r));
+
+  /* ---------- go to date / replay from a date (bottom bar calendar) ---------- */
+  const cal = { y: 0, m: 0, sel: -1 };
+  function sessMap() { const mp = {}; M.sessions.forEach((s, i) => { const p = N.istParts(s.time); mp[p.yr + '-' + p.mon + '-' + p.day] = i; }); return mp; }
+  function renderCal() {
+    const pop = $('calPop'), mp = sessMap(), cur = M.clock(S.sec).sessionIndex, first = new Date(Date.UTC(cal.y, cal.m, 1)), dim = new Date(Date.UTC(cal.y, cal.m + 1, 0)).getUTCDate(), off = (first.getUTCDay() + 6) % 7;
+    const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    let g = ''; for (let i = 0; i < off; i++) g += '<u></u>';
+    for (let d = 1; d <= dim; d++) { const si = mp[cal.y + '-' + cal.m + '-' + d]; g += si == null ? '<span class="cdis">' + d + '</span>' : '<button class="cday' + (si === cal.sel ? ' sel' : '') + (si === cur ? ' cur' : '') + (si > cur ? ' fut' : '') + '" data-si="' + si + '">' + d + '</button>'; }
+    const si = cal.sel, ok = si >= 0, past = ok && si <= cur;
+    pop.innerHTML = '<div class="calh"><button class="btn icon sm" data-m="-1">' + N.icon('chev', 14) + '</button><b>' + MN[cal.m] + ' ' + cal.y + '</b><button class="btn icon sm" data-m="1">' + N.icon('chev', 14) + '</button><span class="grow"></span><button class="btn icon sm" data-x="1">' + N.icon('x', 14) + '</button></div><div class="calw"><i>M</i><i>T</i><i>W</i><i>T</i><i>F</i><i>S</i><i>S</i></div><div class="calg">' + g + '</div>' +
+      '<div class="calnote">' + (ok ? '<b>' + M.sessions[si].dateStr + '</b>' + (si === cur ? ' · the day you are on' : si > cur ? ' · later than the replay clock' : ' · already played') : 'Pick a trading day. ' + M.sessions.length + ' sessions are available in this chart.') + '</div>' +
+      '<div class="calb"><button class="btn solid" data-go="1"' + (past ? '' : ' disabled') + '>Go to date</button><button class="btn buy" data-rp="1"' + (ok ? '' : ' disabled') + '>' + N.icon('play', 13) + ' Replay from here</button></div>';
+    pop.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { cal.m += +b.dataset.m; if (cal.m < 0) { cal.m = 11; cal.y--; } if (cal.m > 11) { cal.m = 0; cal.y++; } renderCal(); });
+    pop.querySelectorAll('.cday').forEach(b => b.onclick = () => { cal.sel = +b.dataset.si; renderCal(); });
+    pop.querySelector('[data-x]').onclick = () => pop.classList.remove('show');
+    pop.querySelector('[data-go]').onclick = () => { if (cal.sel < 0) return; goToSession(cal.sel); pop.classList.remove('show'); };
+    pop.querySelector('[data-rp]').onclick = () => { if (cal.sel < 0) return; replayFromSession(cal.sel); pop.classList.remove('show'); };
+  }
+  function goToSession(si) {
+    const t = M.sessions[si].time + 3 * 3600, idx = chart.idxOfTime(t); chart.followLatest = false; chart.hooks.onFollow(false); chart.autoY = true;
+    chart.viewEndFloat = N.clamp(idx + chart.viewCount / 2, 8, chart.d.maxEndFloat); chart.render(); N.sfx.click(); N.toast('Showing ' + M.sessions[si].dateStr + ' — press “Jump to live” to come back', 'info');
+  }
+  function replayFromSession(si) {
+    if (S.pos) { if (!confirm('Replaying from another day closes your open position at market. Continue?')) return; closeMarket('NEXT'); }
+    pause(); S.orders = []; S.sec = M.sessions[si].i0 * 60 + 1; S.ic = {}; S.lastKey = ''; chart.measure = null;
+    const p = M.priceAt(S.sec); S.price = p; setPlanDefaults(p); N.rcSetEntry(p); chart.resetView(); refreshHeader(); refresh(); renderPanels(true);
+    N.toast('Replay set to ' + M.sessions[si].dateStr + ' 09:15 — press ▶ to start. Everything after this moment is hidden.', 'info');
+  }
+  $('stCal').onclick = e => { e.stopPropagation(); const pop = $('calPop'); if (pop.classList.contains('show')) { pop.classList.remove('show'); return; } const cur = M.sessions[M.clock(S.sec).sessionIndex], p = N.istParts(cur.time); cal.y = p.yr; cal.m = p.mon; cal.sel = -1; pop.classList.add('show'); renderCal(); };
+  document.addEventListener('pointerdown', e => { const pop = $('calPop'); if (pop.classList.contains('show') && !pop.contains(e.target) && !$('stCal').contains(e.target)) pop.classList.remove('show'); }, true);
   document.querySelectorAll('#stScale button').forEach(b => b.onclick = () => {
     const m = b.dataset.s; const cur = chart.scaleMode; const nx = (m === 'auto') ? 'auto' : (cur === m ? 'auto' : m);
     if (m === 'auto') { chart.resetPrice(); } chart.setScale(nx);

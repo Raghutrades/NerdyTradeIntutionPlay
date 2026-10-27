@@ -69,6 +69,13 @@
     else if (mode === 'reset') { const a = N.account(); if (a.cur && !a.cur.blown) L.add({ type: 'blowup', amount: a.bal, note: 'Account reset' }); if (a.bal > 0) L.add({ type: 'writeoff', amount: a.bal, note: 'Residual written off' }); L.add({ type: 'deposit', amount: amt, note: note || 'Fresh start' }); }
     N.updateBalanceChip(); if (dashOpen) renderDash(); N.toast(mode === 'withdraw' ? 'Withdrawn ' + inr(amt, 0) : 'Capital added: ' + inr(amt, 0), 'info');
   }
+  // change the account's starting capital (rewrites the opening ledger entry, so every curve/ROI re-bases)
+  N.setStartCapital = function (v) {
+    v = Math.round(v); if (!(v >= 100)) return false;
+    N.cfg.capital = v; N.saveCfg && N.saveCfg();
+    const e = L.list.find(x => x.type === 'start'); if (e) { e.amount = v; L.save(); }
+    N.updateBalanceChip(); if (dashOpen) renderDash(); N.toast('Starting capital set to ' + inr(v, 0), 'info'); return true;
+  };
   N.capitalAction = mode => N.askCapital(mode, (v, note) => applyCapital(mode, v, note));
   // called after every closed trade
   N.checkBlowup = function () {
@@ -172,19 +179,19 @@
     if (lives.length > 1) h += '<select data-f="life"><option value="">All account lives</option>' + lives.map(l => '<option value="' + l.n + '"' + (F.life === String(l.n) ? ' selected' : '') + '>Life #' + l.n + (l.blown ? ' ✖' : '') + '</option>').join('') + '</select>';
     return h + '</div>';
   }
-  function tabs() { return [['overview', 'gauge', 'Overview'], ['trades', 'list', 'Trades'], ['account', 'wallet', 'Account'], ['insights', 'brain', 'Insights'], ['calendar', 'calendar', 'Calendar']].map(t => '<button class="dtab' + (tab === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '">' + N.icon(t[1], 16) + '<span>' + t[2] + '</span></button>').join(''); }
+  function tabs() { return [['overview', 'gauge', 'Overview'], ['trades', 'list', 'Trades'], ['account', 'wallet', 'Account'], ['insights', 'brain', 'Insights'], ['risk', 'shield', 'Risk lab'], ['discipline', 'target', 'Discipline'], ['calendar', 'calendar', 'Calendar']].map(t => '<button class="dtab' + (tab === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '">' + N.icon(t[1], 16) + '<span>' + t[2] + '</span></button>').join(''); }
 
   function renderDash() {
     const root = $('dash'); if (!root) return; const acct = N.account(), A = filtered(acct), S = advanced(A, N.cfg.capital); lastS = S; vis = A;
     const scrollTop = root.querySelector('.db') ? root.querySelector('.db').scrollTop : 0;
     root.innerHTML = '<div class="dh"><div class="dt">' + N.icon('dashb', 20) + '<b>Performance dashboard</b></div><div class="dtabs">' + tabs() + '</div><button class="btn icon" id="dashClose" title="Close (Esc)">' + N.icon('x', 18) + '</button></div><div class="db" id="dashBody"></div>';
     const body = $('dashBody'); let h = '';
-    if (tab === 'overview') h = vOverview(S, A, acct); else if (tab === 'trades') h = vTrades(A, acct); else if (tab === 'account') h = vAccount(S, acct); else if (tab === 'insights') h = vInsights(S, A); else h = vCalendar(A, acct);
+    if (tab === 'overview') h = vOverview(S, A, acct); else if (tab === 'trades') h = vTrades(A, acct); else if (tab === 'account') h = vAccount(S, acct); else if (tab === 'insights') h = vInsights(S, A); else if (tab === 'risk') h = vRisk(S, A, acct); else if (tab === 'discipline') h = vDisc(S, A, acct); else h = vCalendar(A, acct);
     body.innerHTML = h; N.hydrate(body);
     root.querySelectorAll('.dtab').forEach(b => b.onclick = () => { tab = b.dataset.tab; renderDash(); });
     $('dashClose').onclick = closeDash;
     body.querySelectorAll('[data-f]').forEach(el => el.onchange = el.oninput = () => { F[el.dataset.f] = el.value; if (el.dataset.f === 'q') { clearTimeout(el._t); el._t = setTimeout(renderDash, 250); } else renderDash(); });
-    afterRender(S, A, acct); body.scrollTop = scrollTop;
+    afterRender(S, A, acct); afterRender2(S, A, acct); body.scrollTop = scrollTop;
   }
   function vOverview(S, A, acct) {
     let h = filterBar(acct);
@@ -256,6 +263,7 @@
     h += '</div><div class="btnrow"><button class="btn solid" data-cap="deposit">' + N.icon('plus', 14) + ' Add capital</button><button class="btn solid" data-cap="withdraw">' + N.icon('minus', 14) + ' Withdraw</button><button class="btn solid" data-cap="reset">' + N.icon('restart', 14) + ' Reset / fresh account</button></div>';
     h += '<div class="dcard"><h3>Account lives <span>one row per account — a blow-up ends a life</span></h3><div class="twrap"><table class="tbl"><thead><tr><th>#</th><th>Started</th><th>Capital</th><th>Top-ups</th><th>Trades</th><th>Win%</th><th>P&amp;L</th><th>Max DD</th><th>Ended</th></tr></thead><tbody>' + acct.lives.slice().reverse().map(l => '<tr><td>' + l.n + '</td><td>' + dstr(l.startTs) + '</td><td>' + inr(l.capital, 0) + '</td><td>' + l.topups + '</td><td>' + l.trades + '</td><td>' + (l.trades ? Math.round(l.wins / l.trades * 100) + '%' : '—') + '</td><td class="' + cl(l.pnl) + '">' + sg(l.pnl, 0) + '</td><td class="neg">' + inr(l.maxDD, 0) + '</td><td>' + (l.blown ? '<b class="neg">✖ blown ' + dstr(l.endTs) + '</b>' : '<span class="pos">active</span>') + '</td></tr>').join('') + '</tbody></table></div></div>';
     h += '<div class="dcard"><h3>Ledger <span>capital events</span></h3><div class="ledger">' + L.list.slice().reverse().map(e => { const meta = { start: ['Start', 'pos', '+'], deposit: ['Deposit', 'pos', '+'], withdraw: ['Withdraw', 'neg', '−'], writeoff: ['Write-off', 'neg', '−'], blowup: ['Blow-up', 'neg', '✖'] }[e.type] || [e.type, '', '']; return '<div class="lrow"><span class="lt ' + meta[1] + '">' + meta[0] + '</span><span class="num">' + (e.type === 'blowup' ? 'at ' + inr(e.amount, 0) : meta[2] + inr(e.amount, 0)) + '</span><span class="dim">' + dstr(e.ts) + (e.note ? ' · ' + esc(e.note) : '') + '</span>' + (e.type !== 'start' ? '<button class="btn icon sm" data-delev="' + e.id + '" title="Remove entry">' + N.icon('x', 13) + '</button>' : '') + '</div>'; }).join('') + '</div></div>';
+    h += '<div class="dcard"><h3>Starting capital <span>the base for ROI, drawdown % and the blow-up level</span></h3><div class="frow"><div class="ft"><span>Default / starting capital (₹)</span><span class="fs">Editing it re-bases your whole history; use “Add capital” for a top-up instead</span></div><div class="ctl"><input type="number" id="startCap" min="100" step="1000" value="' + (L.list.find(x => x.type === 'start') || { amount: N.cfg.capital }).amount + '"><button class="btn sm solid" id="startCapBtn">Save</button></div></div></div>';
     h += '<div class="dcard"><h3>Blow-up threshold</h3><div class="frow"><div class="ft"><span>Account counts as blown at</span><span class="fs">% of the capital you put into that account life</span></div><div class="ctl"><input type="number" id="blowPct" min="0" max="90" step="5" value="' + N.cfg.blowPct + '"><span class="val">%</span></div></div></div>';
     return h;
   }
@@ -306,6 +314,7 @@
     body.querySelectorAll('.trow').forEach(r => r.onclick = () => N.openTradeView(vis[+r.dataset.i], vis));
     body.querySelectorAll('[data-cal]').forEach(b => b.onclick = () => { calMonth.m += +b.dataset.cal; if (calMonth.m < 0) { calMonth.m = 11; calMonth.y--; } if (calMonth.m > 11) { calMonth.m = 0; calMonth.y++; } renderDash(); });
     body.querySelectorAll('.cd.has').forEach(c => c.onclick = () => { F.day = c.dataset.day; tab = 'trades'; renderDash(); });
+    const sc = $('startCapBtn'); if (sc) sc.onclick = () => { if (!N.setStartCapital(parseFloat($('startCap').value))) N.toast('Enter at least ₹100', 'error'); };
     const bp = $('blowPct'); if (bp) bp.onchange = () => { N.cfg.blowPct = Math.max(0, Math.min(90, parseFloat(bp.value) || 25)); N.saveCfg(); };
     if (tab === 'overview' && S.n) {
       // equity from the ledger timeline restricted to the visible trades
@@ -332,15 +341,106 @@
   function closeDash() { dashOpen = false; $('dash').classList.remove('show'); document.body.classList.remove('dash-open'); closeTradeView(); }
   N.openDash = openDash; N.closeDash = closeDash; N.dashRefresh = () => { if (dashOpen) renderDash(); };
 
+  /* ====================== risk lab + discipline lab ====================== */
+  const quant = (arr, p) => { if (!arr.length) return 0; const a = arr.slice().sort((x, y) => x - y), i = (a.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return a[lo] + (a[hi] - a[lo]) * (i - lo); };
+  const median = arr => quant(arr, 0.5), clampN = (v, a, b) => Math.max(a, Math.min(b, v));
+  function riskStats(A, acct) {
+    const n = A.length, nets = A.map(t => t.net), R = A.filter(t => t.r != null).map(t => t.r), o = {};
+    const losses = sum(nets.filter(v => v < 0), v => -v), wins = sum(nets.filter(v => v > 0), v => v);
+    o.gtp = losses > 0 ? (wins - losses) / losses : null;
+    const p95 = quant(nets, 0.95), p05 = quant(nets, 0.05); o.tail = p05 < 0 ? p95 / Math.abs(p05) : null; o.var95 = p05; const worst = nets.filter(v => v <= p05); o.cvar95 = worst.length ? sum(worst, v => v) / worst.length : p05;
+    const cap = acct.cur ? acct.cur.capital : N.cfg.capital, rk = A.filter(t => t.risk > 0).map(t => t.risk * t.qty);
+    if (rk.length) { const m = sum(rk, v => v) / rk.length, sd = Math.sqrt(sum(rk, v => (v - m) ** 2) / rk.length); o.avgRisk = m; o.sizeCv = m > 0 ? sd / m : null; o.riskPct = cap > 0 ? m / cap * 100 : null; }
+    if (R.length >= 5) {
+      const m = sum(R, v => v) / R.length, sd = Math.sqrt(sum(R, v => (v - m) ** 2) / (R.length - 1)); o.eR = m; o.sdR = sd;
+      const ruinAmt = cap * (1 - (N.cfg.blowPct || 0) / 100), U = o.avgRisk > 0 ? ruinAmt / o.avgRisk : null; o.U = U;
+      o.ror = m <= 0 ? 1 : (U && sd > 0 ? Math.min(1, Math.exp(-2 * m * U / (sd * sd))) : null);
+      let bestF = 0, bestG = -Infinity; for (let f = 0; f <= 0.5; f += 0.0025) { let g = 0, ok = true; for (const r of R) { const x = 1 + f * r; if (x <= 0) { ok = false; break; } g += Math.log(x); } if (ok && g > bestG) { bestG = g; bestF = f; } } o.kellyF = bestF;
+    }
+    let cur = 0, mx = 0; nets.forEach(v => { if (v < 0) { cur++; mx = Math.max(mx, cur); } else cur = 0; }); o.maxLoseStreak = mx; const w = nets.filter(v => v > 0).length / n, l = 1 - w; o.expStreak = l > 0 && l < 1 && n * w > 1 ? Math.log(n * w) / Math.log(1 / l) : null;
+    const eq = [0]; nets.forEach(v => eq.push(eq[eq.length - 1] + v)); const dds = []; let pk = 0, pi = 0, c2 = null;
+    for (let i = 1; i < eq.length; i++) { if (eq[i] >= pk) { if (c2) { c2.rec = i - c2.peakI; dds.push(c2); c2 = null; } pk = eq[i]; pi = i; } else { if (!c2) c2 = { peakI: pi, depth: 0, troughI: i, rec: null }; const d = pk - eq[i]; if (d > c2.depth) { c2.depth = d; c2.troughI = i; c2.pk = pk; } } }
+    if (c2) dds.push(c2); o.dds = dds.sort((a, b) => b.depth - a.depth).slice(0, 5); o.cap = cap; return o;
+  }
+  function vRisk(S, A, acct) {
+    let h = filterBar(acct); if (A.length < 5) return h + '<div class="empty">The risk lab needs at least 5 closed trades in this range.</div>';
+    const o = riskStats(A, acct), mc = monteCarlo(A, acct.bal, 150, 500); lastMc = mc;
+    h += '<div class="dgrid kpis">' + kpi('Risk of ruin', o.ror != null ? pct(o.ror * 100, 1) : '—', o.U ? 'of falling to ' + N.cfg.blowPct + '% of capital · cushion ≈ ' + o.U.toFixed(0) + 'R' : 'needs trades with a stop (R data)', o.ror != null ? (o.ror > 0.2 ? 'neg' : o.ror < 0.05 ? 'pos' : '') : '', 'hero')
+      + kpi('VaR 95% / trade', sg(o.var95, 0), '1 trade in 20 is worse than this', 'neg') + kpi('CVaR 95%', sg(o.cvar95, 0), 'average of those worst trades', 'neg')
+      + kpi('Tail ratio', o.tail != null ? o.tail.toFixed(2) : '—', 'best 5% ÷ worst 5% (above 1 = fat right tail)', o.tail != null ? (o.tail >= 1 ? 'pos' : 'neg') : '') + kpi('Gain-to-pain', o.gtp != null ? o.gtp.toFixed(2) : '—', 'net ÷ sum of all losses', o.gtp != null ? cl(o.gtp) : '')
+      + kpi('Growth-optimal risk', o.kellyF != null ? pct(o.kellyF * 100, 1) : '—', 'full Kelly on your R-multiples — trade ¼ to ½ of it')
+      + kpi('Your avg risk', o.riskPct != null ? pct(o.riskPct, 2) : '—', 'of capital per trade', o.riskPct != null && o.kellyF != null ? (o.riskPct > o.kellyF * 100 ? 'neg' : 'pos') : '')
+      + kpi('Longest losing streak', o.maxLoseStreak + '', o.expStreak != null ? 'pure luck at your win rate ≈ ' + o.expStreak.toFixed(1) : '', o.expStreak != null && o.maxLoseStreak > o.expStreak * 1.6 ? 'neg' : '')
+      + kpi('Size consistency', o.sizeCv != null ? pct(o.sizeCv * 100, 0) : '—', 'spread of ₹ risk per trade — lower is steadier', o.sizeCv != null ? (o.sizeCv > 0.6 ? 'neg' : o.sizeCv < 0.25 ? 'pos' : '') : '')
+      + (mc ? kpi('P(profit, next 150)', pct(mc.probUp, 0), 'if the next trades resemble these') + kpi('P(−20% drawdown)', pct(mc.probDD20, 0), 'at some point in 150 trades', mc.probDD20 > 30 ? 'neg' : '') : '') + '</div>';
+    h += '<div class="dcard"><h3>Where your account could go <span>500 resampled futures · 150 trades · bands are 10th–90th percentile</span></h3><canvas id="cvMc2"></canvas><div class="note" id="mcNote2"></div></div>';
+    h += '<div class="dcard"><h3>Deepest drawdowns <span>measured on closed-trade P&amp;L</span></h3>' + (o.dds.length ? '<div class="twrap"><table class="tbl"><thead><tr><th>#</th><th>Depth</th><th>% of capital</th><th>Peak after trade</th><th>Bottom at trade</th><th>Recovered</th></tr></thead><tbody>' + o.dds.map((d, i) => '<tr><td>' + (i + 1) + '</td><td class="neg">−' + inr(d.depth, 0) + '</td><td>' + pct(d.depth / o.cap * 100, 1) + '</td><td>#' + d.peakI + '</td><td>#' + d.troughI + '</td><td>' + (d.rec != null ? 'after ' + d.rec + ' trades' : '<b class="neg">not yet</b>') + '</td></tr>').join('') + '</tbody></table></div>' : '<div class="note">No drawdown yet — every trade made a new high.</div>') + '</div>';
+    const adv = []; if (o.riskPct != null && o.kellyF) adv.push(o.riskPct > o.kellyF * 100 ? 'You risk <b>' + pct(o.riskPct, 2) + '</b> per trade, more than the growth-optimal <b>' + pct(o.kellyF * 100, 1) + '</b> — above Kelly, drawdowns grow faster than returns. Size down.' : 'Your <b>' + pct(o.riskPct, 2) + '</b> risk per trade is under full Kelly (' + pct(o.kellyF * 100, 1) + ') — a sane place to be.');
+    if (o.ror != null && o.ror > 0.1) adv.push('Risk of ruin <b>' + pct(o.ror * 100, 1) + '</b> is high: raise your edge (expectancy) or cut size; halving risk per trade squares the ruin odds.');
+    if (o.tail != null && o.tail < 1) adv.push('Tail ratio below 1: your worst trades are bigger than your best — the classic “cut winners, ride losers” signature.');
+    if (o.expStreak != null && o.maxLoseStreak > o.expStreak * 1.6) adv.push('Your longest losing streak (' + o.maxLoseStreak + ') is far above what luck alone gives (≈' + o.expStreak.toFixed(1) + ') — streaks of that length usually mean tilt, not variance.');
+    if (adv.length) h += '<div class="dcard"><h3>Read-out</h3><ul class="ins">' + adv.map(x => '<li>' + x + '</li>').join('') + '</ul></div>';
+    return h;
+  }
+  function discipline(A) {
+    const o = { rows: [] }, n = A.length, sorted = A.slice().sort((a, b) => a.ts - b.ts), byDay = new Map();
+    sorted.forEach(t => { const k = dayK(t.ts); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(t); });
+    const riskAmts = sorted.filter(t => t.risk > 0).map(t => t.risk * t.qty), medRisk = riskAmts.length ? median(riskAmts) : 0, avgDay = n / byDay.size, maxT = N.cfg.maxTradesDay > 0 ? N.cfg.maxTradesDay : Math.max(4, Math.round(avgDay * 1.5)), lim = N.cfg.dayLossLimit > 0 ? N.cfg.dayLossLimit : 0;
+    const flags = new Map(); const flag = (t, k) => { if (!flags.has(t)) flags.set(t, new Set()); flags.get(t).add(k); };
+    o.dayIdx = new Map();
+    byDay.forEach(list => { let cum = 0, breached = false; list.forEach((t, i) => { o.dayIdx.set(t, i);
+      const p = list[i - 1]; if (p && p.net < 0) { const gap = (p.seed === t.seed && p.t1 != null && t.t0 != null) ? t.t0 - p.t1 : (t.ts - p.ts) / 1000 * 1; if (gap <= (p.seed === t.seed && p.t1 != null ? 300 : 90)) flag(t, 'revenge'); }
+      if (i >= maxT) flag(t, 'over'); if (breached) flag(t, 'limit'); cum += t.net; if (lim && cum <= -lim) breached = true; }); });
+    sorted.forEach(t => { if (medRisk > 0 && t.risk > 0 && t.risk * t.qty > medRisk * 1.5) flag(t, 'size'); if (!(t.risk > 0)) flag(t, 'nostop'); const ex = (t.exit - t.entry) * t.dir; if (t.mfe != null && t.mfe > 0 && t.net > 0 && ex < t.mfe * 0.5) flag(t, 'early'); });
+    const def = [['revenge', 'Revenge re-entries', 'taken right after a loss'], ['size', 'Oversized trades', '1.5× your median risk or more'], ['over', 'Over-trading', 'beyond ' + maxT + ' trades in a day'], ['limit', 'Past your daily loss limit', lim ? 'after losing ' + inr(lim, 0) + ' that day' : 'set a limit below to track this'], ['nostop', 'No stop defined', 'risk could not be measured'], ['early', 'Winners cut early', 'closed under half of the best run']];
+    def.forEach(([k, nm, sub]) => { const L = sorted.filter(t => flags.has(t) && flags.get(t).has(k)), net = sum(L, t => t.net); o.rows.push({ k, nm, sub, n: L.length, net, avg: L.length ? net / L.length : 0, wr: L.length ? L.filter(t => t.net > 0).length / L.length * 100 : 0, list: L }); });
+    o.flags = flags; o.medRisk = medRisk; o.maxT = maxT; o.lim = lim; o.sorted = sorted;
+    const share = k => o.rows.find(r => r.k === k).n / n, cv = (() => { if (riskAmts.length < 3) return null; const m = sum(riskAmts, v => v) / riskAmts.length, sd = Math.sqrt(sum(riskAmts, v => (v - m) ** 2) / riskAmts.length); return m > 0 ? sd / m : null; })();
+    const wn = sorted.filter(t => t.net > 0 && t.mfe > 0), cap = wn.length ? sum(wn, t => clampN(((t.exit - t.entry) * t.dir) / t.mfe, 0, 1)) / wn.length : null;
+    o.comp = [['Stops defined', 100 * (1 - share('nostop')), 'every trade has a measurable risk', 1.2], ['Revenge control', clampN(100 * (1 - share('revenge') * 2.5), 0, 100), 'no instant re-entries after a loss', 1.2], ['Size consistency', cv == null ? null : clampN(100 * (1 - cv), 0, 100), 'same ₹ risk each time', 1], ['Patience', clampN(100 * (1 - share('over') * 2), 0, 100), 'no over-trading days', 1], ['Letting winners run', cap == null ? null : clampN(cap * 130, 0, 100), 'share of the best run captured on winners', 1], ['Daily-loss rule', lim ? clampN(100 * (1 - share('limit') * 3), 0, 100) : null, 'stopped when the limit was hit', 1.2]].filter(c => c[1] != null);
+    const wsum = sum(o.comp, c => c[3]); o.score = Math.round(sum(o.comp, c => c[1] * c[3]) / wsum);
+    // what-if lab
+    const base = sum(sorted, t => t.net), sc = [], add = (nm, v, note) => sc.push({ nm, v, d: v - base, note });
+    ['revenge', 'size', 'over', 'limit'].forEach(k => { const r = o.rows.find(x => x.k === k); if (r.n && (k !== 'limit' || lim)) add('Skip the ' + r.nm.toLowerCase(), base - r.net, r.n + ' trades'); });
+    add('Cap every loss at 1R', sum(sorted, t => t.risk > 0 && t.net < -t.risk * t.qty - (t.charges || 0) ? -t.risk * t.qty - (t.charges || 0) : t.net), 'perfect stop discipline');
+    add('Let winners reach 60% of their best run', sum(sorted, t => t.net > 0 && t.mfe > 0 ? Math.max(t.net, t.mfe * 0.6 * t.qty - (t.charges || 0)) : t.net), 'not “perfect”, just patient');
+    const hrs = grp(sorted, t => t.clock ? parseInt(t.clock.slice(0, 2), 10) : null); let bh = null, wh = null; hrs.forEach((g, k) => { if (!bh || g.net > hrs.get(bh).net) bh = k; if (!wh || g.net < hrs.get(wh).net) wh = k; });
+    if (hrs.size > 2 && wh != null && hrs.get(wh).net < 0) add('Never trade in the ' + wh + ':00 hour', base - hrs.get(wh).net, hrs.get(wh).n + ' trades');
+    o.base = base; o.scen = sc; return o;
+  }
+  function vDisc(S, A, acct) {
+    let h = filterBar(acct); if (A.length < 5) return h + '<div class="empty">The discipline lab needs at least 5 closed trades in this range.</div>';
+    const o = discipline(A), tape = o.sorted.slice(-90), sc = o.score, scCol = sc >= 75 ? 'var(--up)' : sc >= 50 ? '#f59e0b' : 'var(--down)';
+    h += '<div class="dcard"><h3>Trade tape <span>last ' + tape.length + ' trades · green = win · red = loss · dot = rule broken</span></h3><div class="tape">' + tape.map(t => { const f = o.flags.get(t); return '<i class="' + (t.net > 0 ? 'w' : t.net < 0 ? 'l' : 'b') + (f ? ' x' : '') + '" title="' + esc(t.sym) + ' ' + sg(t.net, 0) + (f ? ' · ' + [...f].join(', ') : '') + '"></i>'; }).join('') + '</div></div>';
+    h += '<div class="dcols"><div class="dcard"><h3>Discipline score</h3><div class="score" style="color:' + scCol + '">' + sc + '<small>/100</small></div><div class="sbar"><i style="width:' + sc + '%;background:' + scCol + '"></i></div>' + o.comp.map(c => '<div class="comp"><span>' + c[0] + '<em>' + c[2] + '</em></span><b style="color:' + (c[1] >= 75 ? 'var(--up)' : c[1] >= 50 ? '#f59e0b' : 'var(--down)') + '">' + Math.round(c[1]) + '</b></div>').join('') + '</div>' +
+      '<div class="dcard"><h3>Your rules <span>saved on this device</span></h3><div class="frow"><div class="ft"><span>Daily loss limit (₹)</span><span class="fs">0 = off. Trades after you hit it count as rule-breaks</span></div><div class="ctl"><input type="number" id="ruleLoss" min="0" step="500" value="' + (N.cfg.dayLossLimit || 0) + '"></div></div><div class="frow"><div class="ft"><span>Max trades per day</span><span class="fs">0 = auto (1.5× your average day)</span></div><div class="ctl"><input type="number" id="ruleMax" min="0" step="1" value="' + (N.cfg.maxTradesDay || 0) + '"></div></div></div></div>';
+    h += '<div class="dcard"><h3>What your bad habits cost <span>trades flagged by each rule</span></h3><div class="twrap"><table class="tbl"><thead><tr><th>Behaviour</th><th>Trades</th><th>Win %</th><th>Net P&amp;L</th><th>Per trade</th></tr></thead><tbody>' + o.rows.map(r => '<tr><td><b>' + r.nm + '</b><div class="dim" style="font-size:10.5px">' + r.sub + '</div></td><td>' + r.n + '</td><td>' + (r.n ? pct(r.wr, 0) : '—') + '</td><td class="' + cl(r.net) + '">' + (r.n ? sg(r.net, 0) : '—') + '</td><td class="' + cl(r.avg) + '">' + (r.n ? sg(r.avg, 0) : '—') + '</td></tr>').join('') + '</tbody></table></div></div>';
+    h += '<div class="dcard"><h3>What-if lab <span>replaying your own trades with better behaviour · actual net ' + sg(o.base, 0) + '</span></h3><div class="twrap"><table class="tbl"><thead><tr><th>Scenario</th><th>New net</th><th>Difference</th></tr></thead><tbody>' + o.scen.map(s => '<tr><td>' + s.nm + '<div class="dim" style="font-size:10.5px">' + s.note + '</div></td><td class="' + cl(s.v) + '">' + sg(s.v, 0) + '</td><td class="' + cl(s.d) + '"><b>' + sg(s.d, 0) + '</b></td></tr>').join('') + '</tbody></table></div><div class="note">Approximations from each trade’s recorded risk, best run (MFE) and charges — directional, not exact.</div></div>';
+    // by trade number of the day and after streaks
+    const byN = grp(o.sorted, t => Math.min(3, o.dayIdx.get(t))), lab = ['1st trade of the day', '2nd trade', '3rd trade', '4th or later'];
+    const aft = { 1: { n: 0, net: 0, w: 0 }, 2: { n: 0, net: 0, w: 0 } }; for (let i = 1; i < o.sorted.length; i++) { let k = 0; for (let j = i - 1; j >= 0 && o.sorted[j].net < 0; j--) k++; if (k >= 1) { const g = aft[Math.min(2, k)]; g.n++; g.net += o.sorted[i].net; if (o.sorted[i].net > 0) g.w++; } }
+    h += '<div class="dcols"><div class="dcard"><h3>By trade number of the day</h3>' + [...byN.entries()].sort((a, b) => a[0] - b[0]).map(([k, g]) => '<div class="kv"><span>' + lab[k] + ' · ' + g.n + '</span><b class="' + cl(g.net) + '">' + sg(g.net, 0) + ' · ' + pct(g.w / g.n * 100, 0) + ' win</b></div>').join('') + '</div>' +
+      '<div class="dcard"><h3>After losses <span>do you tilt?</span></h3>' + [[1, 'right after 1 loss'], [2, 'after 2+ losses in a row']].map(([k, nm]) => { const g = aft[k]; return '<div class="kv"><span>' + nm + ' · ' + g.n + '</span><b class="' + (g.n ? cl(g.net) : '') + '">' + (g.n ? sg(g.net / g.n, 0) + ' / trade · ' + pct(g.w / g.n * 100, 0) + ' win' : '—') + '</b></div>'; }).join('') + '</div></div>';
+    // hour x direction heat map
+    const hrs = [9, 10, 11, 12, 13, 14, 15], cell = (dir, hr) => { const L = o.sorted.filter(t => t.dir === dir && t.clock && parseInt(t.clock.slice(0, 2), 10) === hr); return { n: L.length, net: sum(L, t => t.net) }; }, cells = []; hrs.forEach(hr => [1, -1].forEach(d => cells.push(cell(d, hr)))); const mx = Math.max(1, ...cells.map(c => Math.abs(c.net)));
+    h += '<div class="dcard"><h3>When and which way you win <span>net ₹ by entry hour and direction</span></h3><div class="heat" style="grid-template-columns:54px repeat(' + hrs.length + ',1fr)"><i></i>' + hrs.map(x => '<i class="hh">' + x + ':00</i>').join('') + ['Long', 'Short'].map((nm, di) => '<i class="hh">' + nm + '</i>' + hrs.map((hr, hi) => { const c = cells[hi * 2 + di], a = c.n ? 0.15 + 0.7 * Math.abs(c.net) / mx : 0; return '<span style="background:' + (c.n ? (c.net >= 0 ? 'rgba(34,197,94,' + a + ')' : 'rgba(239,68,68,' + a + ')') : 'transparent') + '">' + (c.n ? sg(c.net, 0) + '<small>' + c.n + '×</small>' : '') + '</span>'; }).join('')).join('') + '</div></div>';
+    return h;
+  }
+  let lastMc = null;
+  function afterRender2(S, A, acct) {
+    if (tab === 'risk' && A.length >= 5) { const mc = lastMc; if (mc) { lineChart($('cvMc2'), [{ v: mc.p50, col: '#a78bfa', w: 2, band: [mc.p10, mc.p90] }, { v: mc.p10, col: '#a78bfa66', w: 1, dash: [3, 3] }, { v: mc.p90, col: '#a78bfa66', w: 1, dash: [3, 3] }], { h: 190 }); $('mcNote2').innerHTML = 'Median outcome <b>' + inr(mc.p50[mc.p50.length - 1], 0) + '</b> · pessimistic (10th pct) <b>' + inr(mc.p10[mc.p10.length - 1], 0) + '</b> · optimistic (90th) <b>' + inr(mc.p90[mc.p90.length - 1], 0) + '</b>. Resamples only your recorded trades, so it assumes your future edge matches your past.'; } else { prep($('cvMc2'), 40); $('mcNote2').textContent = 'Needs at least 8 trades.'; } }
+    const rl = $('ruleLoss'), rm = $('ruleMax'); if (rl) rl.onchange = () => { N.cfg.dayLossLimit = Math.max(0, parseFloat(rl.value) || 0); N.saveCfg(); renderDash(); }; if (rm) rm.onchange = () => { N.cfg.maxTradesDay = Math.max(0, parseInt(rm.value) || 0); N.saveCfg(); renderDash(); };
+  }
+
   /* ====================== per-trade chart viewer ====================== */
-  N.withSeed = function (seed, fn) { const cur = M.seed; if (cur === seed) return fn(); M.generate(seed); M.setDensity(N.cfg.tickDensity); try { return fn(); } finally { M.generate(cur); M.setDensity(N.cfg.tickDensity); M.feed.key = ''; } };
+  N.withSeed = function (seed, fn, opts) { const cur = M.seed, co = M.opts, same = (a, b) => (a && a.sym) === (b && b.sym) && (a && a.px) === (b && b.px); if (cur === seed && same(co, opts)) return fn(); M.generate(seed, opts); M.setDensity(N.cfg.tickDensity); try { return fn(); } finally { M.generate(cur, co); M.setDensity(N.cfg.tickDensity); M.feed.key = ''; } };
   let tvChart = null, tvTrade = null, tvList = [], tvTf = null;
   function tvData(t, tf) {
     return N.withSeed(t.seed, () => {
       const ahead = typeof tf === 'number' ? tf * 60 * 28 : 86400 * 3, end = Math.min(M.maxSec, (t.t1 != null ? t.t1 : t.t0) + ahead), f = M.series(tf, end);
       const eT = M.clock(t.t0).time, xT = M.clock(t.t1 != null ? t.t1 : t.t0).time;
       return { candles: f.view.slice(), maxEndFloat: f.maxEndFloat, eT, xT, sym: M.ticker };
-    });
+    }, t.gopt || undefined);
   }
   function openTradeView(t, list) {
     if (!t) return; tvTrade = t; tvList = list || vis || []; const root = $('tview');
@@ -348,7 +448,7 @@
     if (tvTf == null) tvTf = typeof t.tf === 'number' ? t.tf : 5;
     const idx = tvList.indexOf(t), win = t.net >= 0, rr = t.r != null ? (t.r >= 0 ? '+' : '') + t.r.toFixed(2) + 'R' : '—', TAGS = ['', 'A+ setup', 'Plan followed', 'Early entry', 'Late entry', 'FOMO', 'Revenge', 'Moved stop', 'Early exit', 'Held too long', 'Oversized', 'Impulse'];
     root.innerHTML = '<div class="tv"><div class="tvh"><div><b class="' + (t.dir === 1 ? 'pos' : 'neg') + '">' + (t.dir === 1 ? 'LONG' : 'SHORT') + '</b> <b>' + esc(t.sym) + '</b> ×' + t.qty + ' <span class="dim">' + dtstr(t.ts) + '</span></div><div class="tvr"><b class="num ' + cl(t.net) + '">' + sg(t.net, 2) + '</b><span class="' + cl(t.r) + '">' + rr + '</span></div><div class="grow"></div><button class="btn icon sm" id="tvPrev" title="Previous trade">' + N.icon('chev', 15) + '</button><button class="btn icon sm" id="tvNext" title="Next trade">' + N.icon('chev', 15) + '</button><button class="btn icon" id="tvClose" title="Close">' + N.icon('x', 18) + '</button></div>' +
-      '<div class="tvtf">' + [1, 3, 5, 15, 60].map(x => '<button class="chip' + (tvTf === x ? ' on' : '') + '" data-tf="' + x + '">' + N.tfLabel(x) + '</button>').join('') + '<span class="grow"></span><button class="chip" id="tvMain">' + N.icon('play', 12) + ' Replay in main chart</button></div>' +
+      '<div class="tvtf">' + [1, 3, 5, 15, 60].map(x => '<button class="chip' + (tvTf === x ? ' on' : '') + '" data-tf="' + x + '">' + N.tfLabel(x) + '</button>').join('') + '<span class="grow"></span><button class="chip on" id="tvPlay">' + N.icon('play', 12) + ' Replay this trade</button><button class="chip" id="tvSpd" title="Replay speed">2×</button><button class="chip" id="tvMain" title="Reload this day in the main chart and play it there">' + N.icon('candles', 12) + ' Main chart</button></div>' +
       '<div class="tvwrap"><canvas id="tvCanvas"></canvas></div><div class="tvbody" id="tvBody"></div></div>';
     root.classList.add('show');
     root.querySelector('#tvClose').onclick = closeTradeView; root.querySelectorAll('[data-tf]').forEach(b => b.onclick = () => { tvTf = +b.dataset.tf; openTradeView(tvTrade, tvList); });
@@ -357,19 +457,31 @@
     root.querySelector('#tvPrev').onclick = () => go(-1); root.querySelector('#tvNext').onclick = () => go(1); root.querySelector('#tvPrev').style.transform = 'rotate(90deg)'; root.querySelector('#tvNext').style.transform = 'rotate(-90deg)';
     const D = tvData(t, tvTf); const cv = $('tvCanvas'); if (tvChart) { try { tvChart._ro.disconnect(); } catch (e) { } } tvChart = new N.Chart(cv); tvChart.noPlus = true; tvChart.colors = Object.assign({}, N.chart.colors);
     const risk = t.risk > 0 ? t.risk : Math.abs(t.entry - t.exit) || t.entry * 0.005, sl0 = t.sl0 != null ? t.sl0 : t.entry - t.dir * risk, tp0 = t.tp0 != null ? t.tp0 : t.entry + t.dir * risk * 2;
-    const draws = [{ id: 'p', type: t.dir === 1 ? 'longpos' : 'shortpos', a: { t: D.eT, p: t.entry }, b: { t: D.xT, p: t.entry }, tp: tp0, sl: sl0, qty: t.qty, color: '#94a3b8', width: 1.3 },
-      { id: 'e', type: t.dir === 1 ? 'mkup' : 'mkdn', a: { t: D.eT, p: t.entry }, b: { t: D.eT, p: t.entry }, color: t.dir === 1 ? '#26a69a' : '#ef5350', text: 'IN', width: 1.2 },
-      { id: 'x', type: t.dir === 1 ? 'mkdn' : 'mkup', a: { t: D.xT, p: t.exit }, b: { t: D.xT, p: t.exit }, color: win ? '#22c55e' : '#f97316', text: 'OUT ' + (t.reason || ''), width: 1.2 }];
-    tvChart.setData({ draws, hideDraw: false, hidePills: true, shapes: [], hud: null, vol: { on: true, pct: 0.18, alpha: 0.45 }, candles: D.candles, overlays: [], lines: [], zones: [], sub: { mode: 'none' }, maxEndFloat: D.maxEndFloat, tf: tvTf, style: N.cfg.style === 'line' || N.cfg.style === 'area' ? 'candle' : N.cfg.style, countdown: null, symbol: D.sym, tfLabel: N.tfLabel(tvTf) });
+    let eI = 0, xI = 0; D.candles.forEach((c, i) => { if (c.time <= D.eT) eI = i; if (c.time <= D.xT) xI = i; });
+    const paint = k => {
+      const cs = k == null ? D.candles : D.candles.slice(0, k), last = cs.length - 1, inT = k == null || last >= eI, outT = k == null || last >= xI, draws = [];
+      if (inT) draws.push({ id: 'p', type: t.dir === 1 ? 'longpos' : 'shortpos', a: { t: D.eT, p: t.entry }, b: { t: outT ? D.xT : Math.max(D.eT + 60, cs[last].time), p: t.entry }, tp: tp0, sl: sl0, qty: t.qty, color: '#94a3b8', width: 1.3, forceLabels: true },
+        { id: 'e', type: t.dir === 1 ? 'mkup' : 'mkdn', a: { t: D.eT, p: t.entry }, b: { t: D.eT, p: t.entry }, color: t.dir === 1 ? '#26a69a' : '#ef5350', text: 'IN', width: 1.2 });
+      if (outT) draws.push({ id: 'x', type: t.dir === 1 ? 'mkdn' : 'mkup', a: { t: D.xT, p: t.exit }, b: { t: D.xT, p: t.exit }, color: win ? '#22c55e' : '#f97316', text: 'OUT ' + (t.reason || ''), width: 1.2 });
+      tvChart.setData({ draws, hideDraw: false, hidePills: true, shapes: [], hud: null, vol: { on: true, pct: 0.18, alpha: 0.45 }, candles: cs, overlays: [], lines: [], zones: [], sub: { mode: 'none' }, maxEndFloat: k == null ? D.maxEndFloat : Math.min(D.maxEndFloat, k), tf: tvTf, style: N.cfg.style === 'line' || N.cfg.style === 'area' ? 'candle' : N.cfg.style, countdown: null, symbol: D.sym, tfLabel: N.tfLabel(tvTf) });
+    };
+    paint(null);
     tvChart.resize();
     const iE = tvChart.idxOfTime(D.eT), n = D.candles.length; tvChart.viewCount = Math.max(30, Math.min(n, Math.round(n - iE + 38))); tvChart.followLatest = true; tvChart.resize();
+    // in-viewer replay: reveal the candles bar by bar from a little before entry
+    { let k = null, tm = 0, spd = 2; const SP = [1, 2, 4, 8], pb = root.querySelector('#tvPlay'), sb = root.querySelector('#tvSpd');
+      const stop = () => { clearInterval(tm); tm = 0; pb.innerHTML = N.icon('play', 12) + (k != null && k < n ? ' Resume' : ' Replay this trade'); pb.classList.add('on'); };
+      const step = () => { k++; if (k >= n) { k = null; paint(null); stop(); return; } paint(k); tvChart.followLatest = true; tvChart.resize(); };
+      pb.onclick = () => { if (tm) { stop(); return; } if (k == null) { k = Math.max(12, eI - 22); paint(k); tvChart.viewCount = 60; tvChart.followLatest = true; tvChart.resize(); } pb.innerHTML = N.icon('pause', 12) + ' Pause'; tm = setInterval(step, 900 / spd); };
+      sb.onclick = () => { spd = SP[(SP.indexOf(spd) + 1) % SP.length]; sb.textContent = spd + '×'; if (tm) { clearInterval(tm); tm = setInterval(step, 900 / spd); } };
+      root._stopRep = () => clearInterval(tm); }
     // what happened after the exit
     const iX = tvChart.idxOfTime(D.xT); let after = '—'; if (iX < n - 2) { let hi = -Infinity, lo = Infinity; for (let i = iX + 1; i < n; i++) { hi = Math.max(hi, D.candles[i].high); lo = Math.min(lo, D.candles[i].low); } const fav = t.dir === 1 ? hi - t.exit : t.exit - lo, adv = t.dir === 1 ? t.exit - lo : hi - t.exit; after = 'next ' + (n - 1 - iX) + ' bars: best ' + sg(fav * t.qty, 0) + ' (' + fx(fav / risk) + 'R) further, worst ' + sg(-adv * t.qty, 0) + ' (' + fx(-adv / risk) + 'R)'; }
     const kv = (k, v, c) => '<div class="kv"><span>' + k + '</span><b class="' + (c || '') + '">' + v + '</b></div>';
     $('tvBody').innerHTML = '<div class="tvgrid">' + kv('Entry → exit', t.entry.toFixed(2) + ' → ' + t.exit.toFixed(2)) + kv('Stop / target (set)', sl0.toFixed(2) + ' / ' + tp0.toFixed(2)) + kv('Gross · charges', sg(t.gross, 2) + ' · ' + inr(t.charges, 2)) + kv('Net · R', sg(t.net, 2) + ' · ' + rr, cl(t.net)) + kv('Exit reason', esc(t.reason || '—')) + kv('Held', t.dur != null ? N.dur(t.dur) : '—') + kv('MFE · MAE', t.risk > 0 && t.mfe != null ? fx(t.mfe / t.risk) + 'R · ' + fx(t.mae / t.risk) + 'R' : '—') + kv('Market clock', esc(t.clock || '—') + ' · seed ' + t.seed) + '</div><div class="note">After your exit — ' + after + '</div><div class="l3 tvedit"><select id="tvTag">' + TAGS.map(g => '<option value="' + esc(g) + '"' + (g === (t.tag || '') ? ' selected' : '') + '>' + (g || '— tag —') + '</option>').join('') + '</select><input type="text" id="tvNote" placeholder="what did you see / feel? (saved to journal)" value="' + esc(t.note || '') + '"></div>';
     $('tvTag').onchange = e => { T.update(t.id, { tag: e.target.value }); N.refreshAll(); }; $('tvNote').onchange = e => T.update(t.id, { note: e.target.value });
   }
-  function closeTradeView() { const r = $('tview'); if (r) { r.classList.remove('show'); r.innerHTML = ''; } if (tvChart) { try { tvChart._ro.disconnect(); } catch (e) { } tvChart = null; } }
+  function closeTradeView() { const r = $('tview'); if (r) { r._stopRep && r._stopRep(); r._stopRep = null; r.classList.remove('show'); r.innerHTML = ''; } if (tvChart) { try { tvChart._ro.disconnect(); } catch (e) { } tvChart = null; } }
   N.openTradeView = openTradeView; N.closeTradeView = closeTradeView;
 
   /* ====================== init ====================== */
