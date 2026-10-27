@@ -140,7 +140,7 @@
     const el = $('favBar'), l = (C().favTools || []).filter(k => DRAWT[k] || FAVN[k]), on = C().ui.favbar !== false;
     el.classList.toggle('show', on); if (!on) return;
     el.innerHTML = '<span class="grip" id="favGrip" title="Drag to move · double-click to reset">' + N.icon('gripd', 14) + '</span>' + l.map(k => { const nm = DRAWT[k] ? [DRAWT[k].n, DRAWT[k].ic] : FAVN[k]; return '<button class="btn icon sm' + (S.tool === k ? ' on' : '') + '" data-fav="' + k + '" title="' + N.esc(nm[0]) + '">' + N.icon(nm[1], 18) + '</button>'; }).join('') + '<button class="btn icon sm" data-fav="_menu" title="All drawing tools · tap ☆ to favorite">' + N.icon('plus', 16) + '</button><button class="btn icon sm" data-fav="_x" title="Hide this bar (Settings → Floating panels)">' + N.icon('x', 14) + '</button>';
-    el.querySelectorAll('[data-fav]').forEach(b => b.onclick = e => { const k = b.dataset.fav; N.sfx.click(); if (k === '_menu') { N.openMenu(b, drawMenu, 'left'); return; } if (k === '_x') { C().ui.favbar = false; N.saveCfg(); renderFav(); return; } setTool(S.tool === k ? 'cursor' : k); if (S.tool === k) N.toast((DRAWT[k] ? DRAWT[k].n : FAVN[k][0]) + ' — ' + (DRAWT[k] && DRAWT[k].pts === 1 || k === 'hline' ? 'tap the chart' : 'drag on the chart'), 'info'); });
+    el.querySelectorAll('[data-fav]').forEach(b => b.onclick = e => { const k = b.dataset.fav; N.sfx.click(); if (k === '_menu') { N.openMenu(b, drawMenu, 'left'); return; } if (k === '_x') { C().ui.favbar = false; N.saveCfg(); renderFav(); N.toast('Favorites bar hidden — bring it back from the ✏ draw menu → “Favorites bar”', 'info'); return; } setTool(S.tool === k ? 'cursor' : k); if (S.tool === k) N.toast((DRAWT[k] ? DRAWT[k].n : FAVN[k][0]) + ' — ' + (DRAWT[k] && DRAWT[k].pts === 1 || k === 'hline' ? 'tap the chart' : 'drag on the chart'), 'info'); });
     if (makeDragFav) makeDragFav(); applyPos(el, 'favPos');
   }
   let makeDragFav = null;
@@ -154,6 +154,7 @@
     return it.concat([{ label: 'Measure', icon: 'ruler', on: S.tool === 'measure', kbd: 'M', fn: () => setTool(S.tool === 'measure' ? 'cursor' : 'measure') },
       { h: 'Options' }, { label: 'Magnet (snap to OHLC)', check: 1, on: C().magnet, keep: 1, fn: () => { C().magnet = !C().magnet; N.saveCfg(); syncRail(); } },
       { label: 'Stay in drawing mode', check: 1, on: C().stayDraw, keep: 1, fn: () => { C().stayDraw = !C().stayDraw; N.saveCfg(); } },
+      { label: 'Favorites bar', check: 1, on: C().ui.favbar !== false, keep: 1, fn: () => { C().ui.favbar = C().ui.favbar === false; N.saveCfg(); renderFav(); } },
       { label: 'Lock all drawings', check: 1, on: C().lockDraw, keep: 1, fn: () => { C().lockDraw = !C().lockDraw; N.saveCfg(); } },
       { label: 'Hide all drawings', check: 1, on: C().hideDraw, keep: 1, fn: () => { C().hideDraw = !C().hideDraw; N.saveCfg(); syncRail(); refresh(); } },
       { label: 'Remove all drawings', icon: 'trash', fn: clearDrawings }]);
@@ -168,7 +169,7 @@
   $('railCross').onclick = () => { C().showCrosshair = !C().showCrosshair; if (!C().showCrosshair) chart.sticky = null; N.saveCfg(); syncRail(); chart.render(); };
   /* floating controls (order dock, replay strip, TP/SL pills, jump-to-live) */
   function applyUi() {
-    const u = C().ui; if (u.favbar === undefined) u.favbar = true; if (typeof renderFav === 'function') renderFav(); $('dock').classList.toggle('ui-off', !u.dock); $('replayBar').classList.toggle('ui-off', !u.replay); $('jumpLive').classList.toggle('ui-off', !u.jump); $('strip').classList.toggle('ui-off', !u.strip); document.body.classList.toggle('nostrip', !u.strip);
+    const u = C().ui; if (u.favbar === undefined) u.favbar = true; if (u.planLines === undefined) u.planLines = false; if (typeof renderFav === 'function') renderFav(); $('dock').classList.toggle('ui-off', !u.dock); $('replayBar').classList.toggle('ui-off', !u.replay); $('jumpLive').classList.toggle('ui-off', !u.jump); $('strip').classList.toggle('ui-off', !u.strip); document.body.classList.toggle('nostrip', !u.strip);
     const anyOff = !(u.dock && u.replay && u.pills && u.jump && u.lines); $('railFloat').classList.toggle('on', anyOff); $('floatRestore').classList.toggle('show', anyOff);
     chart.hidePills = !u.pills; chart.requestRender(); requestAnimationFrame(() => { applyFloatPos(); chart.resize(); });
   }
@@ -291,7 +292,7 @@
         return { id, price: px, color: col, dashed: true, width: 1.8, draggable: true, autoscale: true, pill: nm + ' ' + N.sgnInr(pnlOf(P, px), 0) + ' · ' + rOf(px).toFixed(1) + 'R', dragPill: p => { const q = mirror(c.snapTicks ? N.roundTick(p) : p); return nm + ' ' + N.sgnInr(pnlOf(P, q), 0) + ' · ' + rOf(q).toFixed(1) + 'R'; } };
       };
       lines.push(mk('tp', P.tp, '#16a34a', 'TP'), mk('sl', P.sl, '#dc2626', 'SL'));
-    } else if (!P && c.plan && showL) {
+    } else if (!P && c.plan && c.ui.planLines) {
       const tp = ptsOf('sideTp'), sl = ptsOf('sideSl'), q = Math.max(1, parseInt($('sideQty').value) || 1), d = S.plan.dir;
       lines.push({ id: 'plan-tp', price: price + d * tp, color: '#16a34a', dashed: true, width: 1.4, alpha: .6, draggable: true, autoscale: true, pill: 'Plan TP ' + (d === 1 ? 'BUY' : 'SELL') + ' +' + tp.toFixed(2) + ' · ' + N.sgnInr(tp * q, 0), pillBg: 'rgba(22,163,74,.6)', tag: false, dragPill: p => { const x = Math.abs(p - price); return 'Plan TP +' + x.toFixed(2) + ' · ' + N.sgnInr(x * q, 0); } });
       lines.push({ id: 'plan-sl', price: price - d * sl, color: '#dc2626', dashed: true, width: 1.4, alpha: .6, draggable: true, autoscale: true, pill: 'Plan SL −' + sl.toFixed(2) + ' · ' + N.sgnInr(-sl * q, 0), pillBg: 'rgba(220,38,38,.6)', tag: false, dragPill: p => { const x = Math.abs(p - price); return 'Plan SL −' + x.toFixed(2) + ' · ' + N.sgnInr(-x * q, 0); } });
@@ -681,10 +682,12 @@
     if ($('modal').classList.contains('show')) return;
     const k = e.key.toLowerCase();
     if (k === 'b') openPos(1); else if (k === 's') openPos(-1); else if (k === 'c') closeMarket('MANUAL'); else if (k === 'v') reversePos();
-    else if (k === ' ') { e.preventDefault(); toggle(); } else if (k === 'r') restart(); else if (k === 'n') newChart(); else if (k === 'h') toggleNaked(); else if (k === 't') $('btnTheme').click();
+    else if (k === ' ' || k === 'arrowdown' || k === 'arrowup') { e.preventDefault(); if (!(k === ' ' && e.repeat) && N.watch) N.watch.cycle(k === 'arrowup' ? -1 : 1); }
+    else if (k === '`' || k === '~') { e.preventDefault(); N.watch && N.watch.toggleChg(); }
+    else if (k === 'p') { e.preventDefault(); toggle(); } else if (k === 'r') restart(); else if (k === 'n') newChart(); else if (k === 'h') toggleNaked(); else if (k === 't') $('btnTheme').click();
     else if (k === 'm') setTool(S.tool === 'measure' ? 'cursor' : 'measure'); else if (k === 'l') setTool(S.tool === 'hline' ? 'cursor' : 'hline'); else if (k === 'f') toggleFloat(); else if (k === 'x') toggleChartFull(); else if (k === 'd') N.openDash(); else if ((k === 'delete' || k === 'backspace') && chart.selDraw) { S.draws = S.draws.filter(d => d.id !== chart.selDraw); chart.selDraw = null; histSnap(); refresh(); renderObjects(); renderSelBar(); } else if (k === 'escape') { if (document.body.classList.contains('chartfull')) toggleChartFull(false); setTool('cursor'); chart.measure = null; chart.sticky = null; chart.selDraw = null; $('ordPop').classList.remove('show'); chart.render(); N.closeMenu(); renderSelBar(); }
     else if (k === 'e') $('chBE').click(); else if (k === 'arrowright') { e.preventDefault(); step(e.shiftKey); }
-    else if (k === '[' || k === ']') { const i = SPEEDS.findIndex(s => s[0] === S.speed); const j = N.clamp(i + (k === ']' ? 1 : -1), 0, SPEEDS.length - 1); setSpeed(SPEEDS[j][0]); }
+    else if (k === '[' || k === ']' || k === '=' || k === '+' || k === '-' || k === '_') { const up = (k === ']' || k === '=' || k === '+'); const i = SPEEDS.findIndex(s => s[0] === S.speed); const j = N.clamp(i + (up ? 1 : -1), 0, SPEEDS.length - 1); setSpeed(SPEEDS[j][0]); N.toast('Replay speed ' + SPEEDS[j][1], 'info'); }
     else if (k >= '1' && k <= '9') { const tf = N.TF_ORDER[parseInt(k, 10) - 1]; if (tf !== undefined) setTf(tf); }
   });
 

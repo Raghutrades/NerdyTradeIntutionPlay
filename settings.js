@@ -10,6 +10,7 @@
     insta: '@NerdyIntruder', instaUrl: 'https://www.instagram.com/nerdyintruder/',
     bio: [
       'I trade Nifty and Bank Nifty options intraday, built around market structure, open-interest divergence and VWAP. I write books and notes for retail traders under the handle @NerdyIntruder — markets, psychology, uncertainty and risk management; never a get-rich shortcut.',
+      'Every number on the dashboard comes from my own practice trades — risk of ruin, discipline score and what-if replays — so I can see my habits before the market charges me for them.',
       'This simulator is my personal training ground: random synthetic charts, a tick-by-tick replay, draggable stop / target and a private journal, so intuition is built by repetition — with zero real money at risk.'
     ],
     chips: ['Market structure', 'VWAP & AVWAP', 'Support / Resistance', 'Supply & Demand', 'Risk first', 'Stoic discipline'],
@@ -103,7 +104,7 @@
       add(range('levelWidth', 'Level line width', 0.6, 3, 0.1, v => v.toFixed(1)));
       add(tog('levelLabels', 'Level labels (PDH, PWL…)'));
       add(sect('Floating controls — drag the ⋮⋮ grip on the dock / replay strip to place them anywhere'));
-      [['dock', 'Order dock (qty · SL · TP · buy · sell)'], ['replay', 'Replay strip'], ['pills', 'TP / SL pills on the chart'], ['lines', 'TP / SL / plan lines on the chart'], ['jump', '“Jump to live” button'], ['favbar', 'Favorite drawing tools bar'], ['strip', 'Date & quote strip (top)'], ['orderBtn', '＋ order button on the price axis'], ['selbar', 'Drawing toolbar (colour · width · lock · delete)']].forEach(([k, n]) => { const l = document.createElement('label'); l.className = 'tog'; l.innerHTML = '<input type="checkbox"><i></i>'; const i = l.firstChild; i.checked = !!N.cfg.ui[k]; i.onchange = () => { N.cfg.ui[k] = i.checked; N.saveCfg(); N.cfgChanged('ui'); }; add(row(n, null, l)); });
+      [['dock', 'Order dock (qty · SL · TP · buy · sell)'], ['replay', 'Replay strip'], ['pills', 'TP / SL pills on the chart'], ['lines', 'TP / SL / plan lines on the chart'], ['jump', '“Jump to live” button'], ['favbar', 'Favorite drawing tools bar'], ['planLines', 'Preview TP / SL lines while flat (off by default)'], ['strip', 'Date & quote strip (top)'], ['orderBtn', '＋ order button on the price axis'], ['selbar', 'Drawing toolbar (colour · width · lock · delete)']].forEach(([k, n]) => { const l = document.createElement('label'); l.className = 'tog'; l.innerHTML = '<input type="checkbox"><i></i>'; const i = l.firstChild; i.checked = !!N.cfg.ui[k]; i.onchange = () => { N.cfg.ui[k] = i.checked; N.saveCfg(); N.cfgChanged('ui'); }; add(row(n, null, l)); });
       add(btn('Reset floating panel positions', 'restart', () => N.resetFloatPos()));
       add(sect('Top strip & splash'));
       add(range('quoteSec', 'New quote every', 2, 20, 1, v => v + ' s'));
@@ -142,7 +143,7 @@
       add(tog('haptics', 'Vibration on phones'));
     } else if (cur === 'about') {
       const A = N.ABOUT, d = document.createElement('div'); d.className = 'about';
-      d.innerHTML = '<img class="logo" src="icon-192.png" onerror="this.src=\'icons/icon-192.png\'" alt=""><h2>' + N.esc(A.app) + '</h2><div class="by">by <b>' + N.esc(A.name) + '</b> · ' + N.esc(A.tagline) + '</div>' +
+      d.innerHTML = '<img class="avatar" src="Image.jpg" alt="" onerror="this.remove()"><img class="logo" src="icon-192.png" onerror="this.src=\'icons/icon-192.png\'" alt=""><h2>' + N.esc(A.app) + '</h2><div class="by">by <b>' + N.esc(A.name) + '</b> · ' + N.esc(A.tagline) + '</div>' +
         A.bio.map(t => '<p>' + N.esc(t) + '</p>').join('') +
         '<a class="ig" href="' + N.esc(A.instaUrl) + '" target="_blank" rel="noopener">' + N.icon('insta', 18) + N.esc(A.insta) + ' on Instagram</a>' +
         '<div class="chips2">' + A.chips.map(t => '<span>' + N.esc(t) + '</span>').join('') + '</div>' +
@@ -158,6 +159,7 @@
       add(rw);
       const sz = (() => { try { return Math.round(((localStorage.getItem('nti2_trades') || '').length + (localStorage.getItem('nti2_cfg') || '').length) / 1024); } catch (e) { return '?'; } })();
       const st = document.createElement('div'); st.className = 'note'; st.textContent = N.tradeStore.list.length + ' trades · ~' + sz + ' KB used'; add(st);
+      add(sect('Reset trades & capital')); { const rr = document.createElement('div'); rr.className = 'btnrow'; rr.appendChild(btn('Reset all trades', 'trash', () => { N.closeModal(); N.resetDialog('trades'); })); rr.appendChild(btn('Reset capital', 'wallet', () => { N.closeModal(); N.resetDialog('capital'); })); rr.appendChild(btn('Reset everything', 'restart', () => { N.closeModal(); N.resetDialog('all'); })); add(rr); }
       add(sect('Chart seed'));
       const si = document.createElement('input'); si.type = 'number'; si.min = 1; si.max = 999999; si.placeholder = 'seed'; si.value = N.market.seed;
       add(row('Load a chart by seed', 'Same seed = same candles, same ticks. Shown in the status bar.', [si, btn('Load', 'play', () => { const v = parseInt(si.value, 10); if (v > 0) { N.loadSeed(v); N.closeModal(); } }, 'solid')]));

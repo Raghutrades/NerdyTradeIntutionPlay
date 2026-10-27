@@ -20,5 +20,5 @@ They are per-browser and per-URL — use **Journal → Backup** to move them or 
 Replace the files, then bump `VERSION` in `sw.js` (e.g. `nti-v2-2`) so installed copies pick up the new version.
 
 ## Shortcuts
-B buy · S sell · C close · V reverse · E stop→breakeven · Space play/pause · → step candle · ⇧→ next session · R restart · N new chart
+B buy · S sell · C close · V reverse · E stop→breakeven · P play/pause · + or ] faster · - or [ slower · Space or ↓ next symbol · ↑ previous symbol · ~ sort watchlist by % change (flips each press) · → step candle · ⇧→ next session · R restart · N new chart
 [ ] speed · 1–9 timeframes · H naked price · T theme · M measure · L horizontal line · Esc cursor

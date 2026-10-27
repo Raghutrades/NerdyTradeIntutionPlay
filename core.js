@@ -49,7 +49,7 @@ window.NTI = window.NTI || {};
     pk2: { ema: false, e13: true, e21: true, e50: true, e200: true, vwap: false, vWk: true, vMo: false, vPd: false, av: false, avDays: 5, b1: true, b2: true, b3: false, adx: false, vb: false, vbPreset: 'Strict', vbLines: true, vbMa: true, labels: false },
     lv: { pd: { hl: false, fib: false }, pw: { hl: false, fib: false }, pm: { hl: false, fib: false }, dayo: false, dayhl: false, orb: false },
     naked: false, plan: true, side: true, panelW: 360, tab: 'trade', favTfs: [1, 5, 15, 60, 'D'],
-    sty: {}, hidden: {}, favTools: ['trend', 'fib', 'rect', 'longpos', 'shortpos', 'text'], favPos: null, ui: { favbar: true, dock: true, replay: true, pills: true, jump: true, lines: true, strip: true, selbar: true, orderBtn: true, quote: true }, dockPos: null, replayPos: null, magnet: false, hideDraw: false, brand: 'NerdyTrade', brandPulse: true,
+    sty: {}, hidden: {}, favTools: ['trend', 'fib', 'rect', 'longpos', 'shortpos', 'text'], favPos: null, ui: { planLines: false, favbar: true, dock: true, replay: true, pills: true, jump: true, lines: true, strip: true, selbar: true, orderBtn: true, quote: true }, dockPos: null, replayPos: null, magnet: false, hideDraw: false, brand: 'NerdyTrade', brandPulse: true,
     axisW: 66, quoteSec: 5, splashSec: 3.4, blowPct: 25, stripSize: 12, lockDraw: false, stayDraw: false, volAlpha: 0.5
   };
   /* ---------- themes ---------- */

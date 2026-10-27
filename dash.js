@@ -164,7 +164,7 @@
 
   /* ====================== dashboard UI ====================== */
   let dashOpen = false, tab = 'overview', F = { range: 'all', sym: '', life: '', dir: '', res: '', tag: '', sort: 'new', q: '', day: '' }, calMonth = null, vis = [], lastS = null;
-  const kpi = (k, v, sub, c, ex) => '<div class="kpi ' + (ex || '') + '"><div class="k">' + k + '</div><div class="v ' + (c || '') + '">' + v + '</div>' + (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>';
+  const kpi = (k, v, sub, c, ex) => '<div class="kpi tap ' + (ex || '') + '" data-kpi="' + esc(k) + '"><div class="k">' + k + '</div><div class="v ' + (c || '') + '">' + v + '</div>' + (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>';
   function filtered(acct) {
     let A = T.list.slice(); const now = Date.now();
     if (F.sym) A = A.filter(t => t.sym === F.sym);
@@ -191,6 +191,7 @@
     root.querySelectorAll('.dtab').forEach(b => b.onclick = () => { tab = b.dataset.tab; renderDash(); });
     $('dashClose').onclick = closeDash;
     body.querySelectorAll('[data-f]').forEach(el => el.onchange = el.oninput = () => { F[el.dataset.f] = el.value; if (el.dataset.f === 'q') { clearTimeout(el._t); el._t = setTimeout(renderDash, 250); } else renderDash(); });
+    body.querySelectorAll('.kpi.tap').forEach(el => el.onclick = () => explainKpi(el)); body.querySelectorAll('[data-reset]').forEach(b => b.onclick = () => N.resetDialog(b.dataset.reset));
     afterRender(S, A, acct); afterRender2(S, A, acct); body.scrollTop = scrollTop;
   }
   function vOverview(S, A, acct) {
@@ -263,6 +264,7 @@
     h += '</div><div class="btnrow"><button class="btn solid" data-cap="deposit">' + N.icon('plus', 14) + ' Add capital</button><button class="btn solid" data-cap="withdraw">' + N.icon('minus', 14) + ' Withdraw</button><button class="btn solid" data-cap="reset">' + N.icon('restart', 14) + ' Reset / fresh account</button></div>';
     h += '<div class="dcard"><h3>Account lives <span>one row per account — a blow-up ends a life</span></h3><div class="twrap"><table class="tbl"><thead><tr><th>#</th><th>Started</th><th>Capital</th><th>Top-ups</th><th>Trades</th><th>Win%</th><th>P&amp;L</th><th>Max DD</th><th>Ended</th></tr></thead><tbody>' + acct.lives.slice().reverse().map(l => '<tr><td>' + l.n + '</td><td>' + dstr(l.startTs) + '</td><td>' + inr(l.capital, 0) + '</td><td>' + l.topups + '</td><td>' + l.trades + '</td><td>' + (l.trades ? Math.round(l.wins / l.trades * 100) + '%' : '—') + '</td><td class="' + cl(l.pnl) + '">' + sg(l.pnl, 0) + '</td><td class="neg">' + inr(l.maxDD, 0) + '</td><td>' + (l.blown ? '<b class="neg">✖ blown ' + dstr(l.endTs) + '</b>' : '<span class="pos">active</span>') + '</td></tr>').join('') + '</tbody></table></div></div>';
     h += '<div class="dcard"><h3>Ledger <span>capital events</span></h3><div class="ledger">' + L.list.slice().reverse().map(e => { const meta = { start: ['Start', 'pos', '+'], deposit: ['Deposit', 'pos', '+'], withdraw: ['Withdraw', 'neg', '−'], writeoff: ['Write-off', 'neg', '−'], blowup: ['Blow-up', 'neg', '✖'] }[e.type] || [e.type, '', '']; return '<div class="lrow"><span class="lt ' + meta[1] + '">' + meta[0] + '</span><span class="num">' + (e.type === 'blowup' ? 'at ' + inr(e.amount, 0) : meta[2] + inr(e.amount, 0)) + '</span><span class="dim">' + dstr(e.ts) + (e.note ? ' · ' + esc(e.note) : '') + '</span>' + (e.type !== 'start' ? '<button class="btn icon sm" data-delev="' + e.id + '" title="Remove entry">' + N.icon('x', 13) + '</button>' : '') + '</div>'; }).join('') + '</div></div>';
+    h += '<div class="dcard"><h3>Reset <span>start clean — back up first</span></h3><div class="btnrow"><button class="btn solid" data-reset="trades">' + N.icon('trash', 14) + ' Reset all trades</button><button class="btn solid" data-reset="capital">' + N.icon('wallet', 14) + ' Reset capital</button><button class="btn sell" data-reset="all">' + N.icon('restart', 14) + ' Reset everything</button></div></div>';
     h += '<div class="dcard"><h3>Starting capital <span>the base for ROI, drawdown % and the blow-up level</span></h3><div class="frow"><div class="ft"><span>Default / starting capital (₹)</span><span class="fs">Editing it re-bases your whole history; use “Add capital” for a top-up instead</span></div><div class="ctl"><input type="number" id="startCap" min="100" step="1000" value="' + (L.list.find(x => x.type === 'start') || { amount: N.cfg.capital }).amount + '"><button class="btn sm solid" id="startCapBtn">Save</button></div></div></div>';
     h += '<div class="dcard"><h3>Blow-up threshold</h3><div class="frow"><div class="ft"><span>Account counts as blown at</span><span class="fs">% of the capital you put into that account life</span></div><div class="ctl"><input type="number" id="blowPct" min="0" max="90" step="5" value="' + N.cfg.blowPct + '"><span class="val">%</span></div></div></div>';
     return h;
@@ -341,6 +343,66 @@
   function closeDash() { dashOpen = false; $('dash').classList.remove('show'); document.body.classList.remove('dash-open'); closeTradeView(); }
   N.openDash = openDash; N.closeDash = closeDash; N.dashRefresh = () => { if (dashOpen) renderDash(); };
 
+
+  /* ---------- tap any metric tile → what it means ---------- */
+  const GLOSS = {
+    'net p&l': ['Everything you made or lost after charges, summed over the trades in view.', 'Σ (exit − entry) × qty × direction − charges', 'The headline, but it hides how you got there — read it with drawdown and expectancy.'],
+    'win rate': ['Share of trades that closed in profit.', 'winners ÷ all trades', 'Meaningless alone: a 35% win rate with 3:1 payoff is a fine system, a 70% win rate with tiny wins and big losses is not.'],
+    'profit factor': ['How many rupees you win for each rupee you lose.', 'gross profit ÷ gross loss', 'Below 1 you are losing. 1.3–2 is healthy for discretionary traders; above 3 on a small sample is usually luck.'],
+    'expectancy': ['What one average trade is worth — the number that decides whether you have an edge.', 'win% × avg win − loss% × avg loss', 'Positive = edge. Shown in ₹ and in R (multiples of the risk you took). Aim for +0.2R or better, repeatable.'],
+    'avg win / loss': ['Your average winner next to your average loser.', 'mean(winning trades) / mean(losing trades)', 'The payoff ratio under it tells you how much win rate you need: payoff 2:1 needs only 34% winners to break even.'],
+    'max drawdown': ['Deepest fall from an equity peak to the next low.', 'max(peak − trough)', 'Decides whether you can survive and keep trading the system. Plan for 2× your historical worst.'],
+    'sharpe (trade)': ['Return per unit of trade-to-trade volatility.', 'mean(trade P&L) ÷ stdev(trade P&L)', 'Higher is steadier. Above ~0.3 per trade is good; negative means the average trade loses.'],
+    'sortino': ['Like Sharpe, but only downside swings are penalised.', 'mean ÷ downside deviation', 'Better than Sharpe for options-style payoffs with big winners.'],
+    'calmar': ['Annualised return relative to the deepest drawdown.', 'annual return % ÷ max drawdown %', 'Above 1 means you earn more per year than the worst pain you suffered. Needs 5+ trading days.'],
+    'recovery factor': ['How many times your profit covers your worst drawdown.', 'net profit ÷ max drawdown', 'Above 3 = the edge comfortably outruns its bad patches.'],
+    'sqn': ["Van Tharp's System Quality Number — a t-score of your R-multiples.", '√N × mean(R) ÷ stdev(R)', '<1.6 poor · 2–2.5 average · 3+ good · 5+ excellent. Needs 30+ trades to trust.'],
+    'kelly (full)': ['The bet size that would maximise long-run growth if your stats are exactly true.', 'W − (1−W) ÷ payoff', 'Never trade full Kelly — it is brutally volatile. ¼–½ Kelly is the grown-up version. Negative means: do not trade this system.'],
+    'ulcer index': ['Depth and duration of drawdowns combined into one stress number.', '√mean(drawdown%²)', 'Lower is calmer. Two equity curves with the same return can have very different ulcer indices.'],
+    'streaks': ['Your longest winning and losing runs and where you are now.', 'consecutive wins / losses', 'Losing streaks are normal — the test is whether your size and rules stay the same during them.'],
+    'avg hold': ['How long you stay in a trade, with winners and losers split.', 'mean(exit time − entry time)', 'If losers are held much longer than winners, you are hoping instead of following the stop.'],
+    'charges paid': ['Brokerage, STT, exchange fees, GST, stamp duty you would have paid.', 'sum of the per-trade cost model (Settings → Costs)', 'If gross profit is positive but net is not, your edge is being eaten by costs — trade less, or larger and slower.'],
+    'trading days': ['Days with at least one closed trade, and how many were green or red.', 'count of days', 'Consistency lives here: many small green days beat a single huge one.'],
+    'best / worst day': ['Your single best and single worst session.', 'max / min(daily P&L)', 'If the worst day wipes out the best, tighten your daily loss rule (Discipline tab).'],
+    'top-5 wins share': ['How much of your gross profit came from your five best trades.', 'top-5 winners ÷ gross profit', 'Very high = results depend on a few lucky outliers. Look at the figure “without top 3”.'],
+    'avg r win / loss': ['Average winner and loser measured in R (multiples of the risk you set).', 'mean(R of winners) / mean(R of losers)', 'Healthy: winners ≥ 1.5R, losers close to −1R. Losers far beyond −1R mean stops are being moved.'],
+    'avg mfe / mae': ['MFE = best open profit a trade reached; MAE = worst open loss it suffered, in R.', 'mean(max favourable) / mean(max adverse)', 'Big MFE on losers = you had the exit and missed it. Big MAE on winners = your stop is too wide.'],
+    'exit efficiency': ['How much of the best available move you captured on winners.', 'exit profit ÷ MFE (winners)', '40–60% is normal. Under 30% = you exit far too early or give it back.'],
+    'skew · kurtosis': ['Shape of your P&L distribution. Skew < 0 = big losers; kurtosis = fat tails.', 'standardised 3rd / 4th moments', 'Negative skew is the signature of “small wins, rare disasters”. Prefer positive skew.'],
+    'balance': ['Current account value: capital plus all trade P&L, minus withdrawals.', 'ledger + trades', 'This is the number your blow-up level is measured against.'],
+    'capital put in': ['Total money deposited across every account life.', 'start + top-ups', 'Compare with balance: a rising balance fed only by top-ups is not progress.'],
+    'withdrawn': ['Money you took out.', 'sum of withdrawals', ''], 'written off': ['Residual balance abandoned when an account was reset after a blow-up.', 'sum of write-offs', 'The true cost of blow-ups.'],
+    'blow-ups': ['Times an account fell to your blow-up level (Account tab → threshold).', 'count', 'Each blow-up is a lesson the simulator gives free. Look at what the last 10 trades before it had in common.'],
+    'account lives': ['Each blow-up + fresh start begins a new life.', 'count', 'Compare lives: is the second one better than the first?'],
+    'total net p&l': ['All-time net across every account life.', 'Σ net', ''], 'max dd (all)': ['Deepest drawdown across all your history.', 'max(peak − trough)', ''],
+    'risk of ruin': ['Probability, from your own results, that the balance ever falls to your blow-up level.', 'exp(−2·μ·U ÷ σ²) on R-multiples; U = cushion in R', 'Under 5% is comfortable. Halving risk per trade squares your ruin odds. Needs trades that had a stop (R data).'],
+    'var 95% / trade': ['Value at Risk: one trade in twenty is worse than this.', '5th percentile of trade P&L', 'Set your daily loss limit relative to this.'],
+    'cvar 95%': ['Expected shortfall: the average of those worst 5% of trades.', 'mean of trades ≤ VaR', 'A truer picture of a bad day than VaR.'],
+    'tail ratio': ['Do your best trades beat your worst ones?', '95th percentile ÷ |5th percentile|', 'Above 1 = fat right tail (good). Below 1 = you cut winners and let losers run.'],
+    'gain-to-pain': ['Net profit relative to all the pain (sum of losses).', 'net ÷ Σ|losses|', 'Above 1 is excellent, 0.25–0.5 decent.'],
+    'growth-optimal risk': ['The % of equity per trade that would maximise compounded growth on your recorded R-multiples.', 'argmax Σ ln(1 + f·R)', 'Trade a quarter to half of it. If it shows 0 your edge is non-positive.'],
+    'your avg risk': ['What you actually risk per trade as % of capital.', 'mean(stop distance × qty) ÷ capital', 'Keep it under the growth-optimal figure and under 1–2% for intraday.'],
+    'longest losing streak': ['Your longest run of losing trades vs what pure luck would give at your win rate.', 'ln(n·w) ÷ ln(1/(1−w))', 'Far above the luck figure = tilt rather than variance.'],
+    'size consistency': ['How much your ₹ risk varies from trade to trade.', 'stdev ÷ mean of risk per trade', 'Under 25% is steady. Large swings mean you size by emotion.'],
+    'p(profit, next 150)': ['Monte-Carlo odds of being ahead after 150 more trades like these.', '500 resampled futures', 'Only as good as your sample — 50+ trades before trusting it.'],
+    'p(−20% drawdown)': ['Odds of a 20% drawdown at some point in the next 150 trades.', '500 resampled futures', 'If above 30%, your size is too big for your edge.']
+  };
+  function explainKpi(el) {
+    const name = el.dataset.kpi || '', g = GLOSS[name.toLowerCase().replace(/&amp;/g, '&')], val = el.querySelector('.v'), sub = el.querySelector('.s'), c = val ? val.className.replace('v', '').trim() : '';
+    const body = '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px"><b class="num ' + c + '" style="font-size:24px">' + (val ? val.innerHTML : '') + '</b><span class="dim">' + (sub ? sub.innerHTML : '') + '</span></div>' +
+      (g ? '<p style="margin:0 0 8px">' + g[0] + '</p>' + (g[1] ? '<div class="note" style="margin:0 0 8px"><b>Formula</b> · ' + g[1] + '</div>' : '') + (g[2] ? '<p style="margin:0"><b>How to read it</b> — ' + g[2] + '</p>' : '') : '<p style="margin:0" class="dim">A derived figure from your journal. Filter by symbol, date range or account life above to see how it changes.</p>');
+    dialog(name, body, [{ t: 'Close', cls: 'solid' }]);
+  }
+  // wipe trades / capital (with an amount for the fresh start)
+  N.resetDialog = function (kind) {
+    const what = { trades: 'Delete ALL logged trades (journal, stats, dashboard history)?', capital: 'Reset the capital ledger — top-ups, withdrawals and blow-up records — to a single fresh start?', all: 'Erase EVERYTHING: all trades, journal notes and the capital history?' }[kind];
+    const o = dialog('Reset ' + (kind === 'all' ? 'everything' : kind), '<p style="margin:0 0 10px">' + what + ' <b class="neg">This cannot be undone</b> — back up first (Settings → Data) if you might want it.</p>' + (kind !== 'trades' ? '<label class="lbl">Starting capital (₹)</label><input type="number" id="dlgAmt" min="100" step="1000" value="' + N.cfg.capital + '">' : ''),
+      [{ t: 'Cancel', cls: 'solid' }, { t: 'Yes, reset', cls: 'sell', fn: d => {
+        const a = d.querySelector('#dlgAmt'), v = a ? parseFloat(a.value) : null; if (a && !(v >= 100)) return false;
+        if (kind !== 'capital') { T.clear(); }
+        if (kind !== 'trades') { N.cfg.capital = v; N.saveCfg && N.saveCfg(); const first = T.list.length ? Math.min(T.list[0].ts, Date.now()) - 1000 : Date.now(); L.list = [{ id: 's0', ts: first, type: 'start', amount: v, note: 'Starting capital' }]; L.save(); }
+        N.updateBalanceChip(); try { N.refreshAll && N.refreshAll(); N.renderStats && N.renderStats(); N.renderJournal && N.renderJournal(); } catch (e) { } if (dashOpen) renderDash(); N.toast('Reset done', 'info'); } }]);
+  };
   /* ====================== risk lab + discipline lab ====================== */
   const quant = (arr, p) => { if (!arr.length) return 0; const a = arr.slice().sort((x, y) => x - y), i = (a.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return a[lo] + (a[hi] - a[lo]) * (i - lo); };
   const median = arr => quant(arr, 0.5), clampN = (v, a, b) => Math.max(a, Math.min(b, v));

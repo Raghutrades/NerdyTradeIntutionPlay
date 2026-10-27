@@ -494,3 +494,17 @@ body.chartfull #app{padding-top:var(--sat)}
   #dock .dfield{font-size:9.5px}#dock .dfield input{width:42px}
   #calPop{bottom:40px}
 }
+
+/* ---- v6.1 ---- */
+.num,#px,#chg,#rpClock,#stDate,#stMode,#stProg,.tick *{font-variant-numeric:tabular-nums}
+.tick{width:112px;min-width:112px;max-width:112px;overflow:hidden;contain:layout paint}
+.tick>*{overflow:hidden;text-overflow:ellipsis}
+#rpClock{display:inline-block;min-width:74px;text-align:center}
+#stMode{display:inline-block;min-width:64px}
+#stDate{display:inline-block;min-width:92px}
+#stProg{display:inline-block;min-width:44px}
+
+.kpi.tap{cursor:pointer;transition:border-color .15s,transform .1s}
+.kpi.tap:hover{border-color:var(--accent,#3b82f6)}.kpi.tap:active{transform:scale(.98)}
+.avatar{display:block;width:104px;height:104px;border-radius:50%;object-fit:cover;margin:0 auto 12px;border:3px solid var(--accent,#3b82f6);box-shadow:0 4px 18px #0006}
+.dlg .note{font-size:12px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel2,#0000001a)}

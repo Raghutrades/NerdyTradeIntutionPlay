@@ -47,6 +47,18 @@
   }
   function load(sym) { const r = Wt.rows.find(x => x.sym === sym); if (!r) return; if (N.S && N.S.pos && !confirm('You have an open position — loading another chart closes it at market. Continue?')) return; N.loadSeed(0, undefined, false, { sym: r.sym, px: r.ltp, fit: true }); renderList(); if (window.innerWidth <= 860) document.getElementById('side').classList.remove('mob-open'); }
   Wt.load = load; Wt.render = renderList;
+  // keyboard: step to next / previous symbol in the list as currently sorted & filtered
+  Wt.cycle = function (d) {
+    Wt.mount(); const a = visible(); if (!a.length) return; const i = a.findIndex(r => r.sym === active());
+    const j = i < 0 ? (d > 0 ? 0 : a.length - 1) : (i + d + a.length) % a.length;
+    load(a[j].sym); const el = document.querySelector('#wlList .wrow.on'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+  };
+  // keyboard ~ : sort by % change; each press flips top→bottom / bottom→top
+  Wt.toggleChg = function () {
+    Wt.mount(); if (Wt.sort === 'chg') Wt.dir = -Wt.dir; else { Wt.sort = 'chg'; Wt.dir = 1; }
+    const sb = $('wlSort'); if (sb) sb.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.k === 'chg'));
+    renderList(); N.toast('Watchlist: % change ' + (Wt.dir === 1 ? 'highest → lowest' : 'lowest → highest'), 'info');
+  };
   Wt.mount = function () {
     const root = $('tab-watch'); if (!root || Wt.ready) return; Wt.ready = true; build();
     root.innerHTML = '<div class="wlhead"><input type="search" id="wlQ" placeholder="Search ' + (N.FNO ? N.FNO.length : 0) + ' F&O symbols…" autocomplete="off"><button class="btn sm solid" id="wlFav" title="Show flagged only">★</button></div>' +
