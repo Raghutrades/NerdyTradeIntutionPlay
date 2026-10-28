@@ -30,7 +30,7 @@
   N.isPosDraw = isPos;
   const FIB = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1], FIBX = [0, 0.382, 0.5, 0.618, 1, 1.272, 1.618, 2, 2.618];
   const DEFCOL = { mkup: '#26a69a', mkdn: '#ef5350', longpos: '#26a69a', shortpos: '#ef5350', text: '#e5e7eb' };
-  N.drawColor = t => DEFCOL[t] || N.sty('draw').c;
+  N.drawColor = t => t === 'text' ? (N.isDark() ? '#e5e7eb' : '#1f2937') : (DEFCOL[t] || N.sty('draw').c);
 
   /* ---------- geometry in pixels ---------- */
   C._dxy = function (dr) { return this._geo(dr); };

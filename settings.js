@@ -27,6 +27,37 @@
   function color(k, title, sub, resetVal) { const i = document.createElement('input'); i.type = 'color'; i.value = N.cfg[k] || '#0f131c'; i.oninput = () => { N.cfg.scheme = 'custom'; chg(k, i.value); }; const els = [i]; if (resetVal !== undefined) { const b = document.createElement('button'); b.className = 'btn sm solid'; b.textContent = 'Reset'; b.onclick = () => { chg(k, resetVal); render(); }; els.push(b); } return row(title, sub, els); }
   function btn(label, icon, fn, cls) { const b = document.createElement('button'); b.className = 'btn ' + (cls || 'solid'); b.innerHTML = N.icon(icon, 15) + '<span>' + label + '</span>'; b.onclick = fn; return b; }
 
+  // colour / width / style editor for one entry of N.STY (used in Colours & levels and in the quick spots)
+  function styBox(k, title, afterReset) {
+    const b = N.STY[k], cur2 = N.sty(k), box = document.createElement('div'); box.className = 'stybox'; box.dataset.k = k;
+    const defHex = () => { try { const d = N.chart && N.chart.colors && N.chart.colors.dim; return /^#[0-9a-f]{6}$/i.test(d) ? d : '#888888'; } catch (e) { return '#888888'; } };
+    const set = (prop, v) => { N.cfg.sty[k] = Object.assign(N.cfg.sty[k] || {}, { [prop]: v }); N.saveCfg(); N.restyle && N.restyle(); };
+    let h = '<div class="nm"><span>' + N.esc(title || b.n) + '</span></div><div class="ctls">';
+    h += '<label>Colour <input type="color" data-p="c" value="' + (/^#[0-9a-f]{6}$/i.test(cur2.c) ? cur2.c : defHex()) + '"></label>';
+    if (b.w != null) h += '<label>Width <input type="range" data-p="w" min="0.5" max="5" step="0.1" value="' + cur2.w + '"></label>';
+    if (b.t != null) h += '<label>Zone thickness <input type="range" data-p="t" min="1" max="20" step="1" value="' + cur2.t + '"></label>';
+    if (b.ds || b.d) h += '<label>Style <select data-p="d"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label>';
+    h += '<button class="btn sm solid" data-p="reset">Reset</button></div>'; box.innerHTML = h;
+    box.querySelectorAll('[data-p]').forEach(el => {
+      const p = el.dataset.p;
+      if (p === 'd') el.value = cur2.d;
+      if (p === 'reset') el.onclick = () => { delete N.cfg.sty[k]; N.saveCfg(); N.restyle && N.restyle(); render(); };
+      else el.oninput = el.onchange = () => set(p, p === 'c' || p === 'd' ? el.value : +el.value);
+    });
+    return box;
+  }
+  // restyle every drawing already on the chart
+  function drawingsBox() {
+    const box = document.createElement('div'); box.className = 'stybox';
+    box.innerHTML = '<div class="nm"><span>Recolour all drawings already on the chart</span></div><div class="ctls"><label>Colour <input type="color" id="dxC" value="#f59e0b"></label><label>Width <input type="range" id="dxW" min="0.5" max="5" step="0.1" value="1.6"></label><label>Style <select id="dxD"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label><button class="btn sm solid" id="dxGo">Apply to all</button></div>';
+    box.querySelector('#dxGo').onclick = () => {
+      const c = box.querySelector('#dxC').value, w = +box.querySelector('#dxW').value, d = box.querySelector('#dxD').value; let n = 0;
+      (N.S.draws || []).forEach(x => { if (N.isPosDraw(x)) return; x.color = c; x.width = w; x.dash = d === 'solid' ? undefined : d; n++; });
+      N.restyle && N.restyle(); N.toast(n + ' drawing' + (n === 1 ? '' : 's') + ' updated — new ones use “New drawings” below', 'info');
+    };
+    return box;
+  }
+
   function render() {
     const body = $('mBody'); body.innerHTML = '';
     $('mTabs').innerHTML = TABS.map(t => '<button class="mtab' + (t[0] === cur ? ' on' : '') + '" data-t="' + t[0] + '">' + N.icon(t[1], 17) + '<span>' + t[2] + '</span></button>').join('');
@@ -64,21 +95,7 @@
       let g = '';
       Object.keys(N.STY).forEach(k => {
         const b = N.STY[k]; if (b.g !== g) { g = b.g; add(sect(g)); }
-        const cur2 = N.sty(k), box = document.createElement('div'); box.className = 'stybox'; box.dataset.k = k;
-        const set = (prop, v) => { N.cfg.sty[k] = Object.assign(N.cfg.sty[k] || {}, { [prop]: v }); N.saveCfg(); N.restyle && N.restyle(); };
-        let h = '<div class="nm"><span>' + N.esc(b.n) + '</span></div><div class="ctls">';
-        h += '<label>Colour <input type="color" data-p="c" value="' + (/^#[0-9a-f]{6}$/i.test(cur2.c) ? cur2.c : '#888888') + '"></label>';
-        if (b.w != null) h += '<label>Width <input type="range" data-p="w" min="0.5" max="5" step="0.1" value="' + cur2.w + '"></label>';
-        if (b.t != null) h += '<label>Zone thickness <input type="range" data-p="t" min="1" max="20" step="1" value="' + cur2.t + '"></label>';
-        if (b.ds || b.d) h += '<label>Style <select data-p="d"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label>';
-        h += '<button class="btn sm solid" data-p="reset">Reset</button></div>'; box.innerHTML = h;
-        box.querySelectorAll('[data-p]').forEach(el => {
-          const p = el.dataset.p;
-          if (p === 'd') el.value = cur2.d;
-          if (p === 'reset') el.onclick = () => { delete N.cfg.sty[k]; N.saveCfg(); N.restyle && N.restyle(); render(); };
-          else el.oninput = el.onchange = () => set(p, p === 'c' || p === 'd' ? el.value : +el.value);
-        });
-        add(box);
+        add(styBox(k));
       });
       const rs = btn('Reset all styles', 'restart', () => { N.cfg.sty = {}; N.saveCfg(); N.restyle && N.restyle(); render(); }); add(rs);
     } else if (cur === 'chart') {
@@ -98,6 +115,10 @@
       add(tog('showCountdown', 'Candle countdown timer'));
       add(tog('showWatermark', 'Symbol watermark'));
       add(tog('showSessionBreaks', 'Session break lines'));
+      add(styBox('sess', 'Session break line — colour, width, style'));
+      add(styBox('grid', 'Grid lines')); add(styBox('cross', 'Crosshair')); add(styBox('last', 'Last-price line'));
+      add(sect('Drawings'));
+      add(styBox('draw', 'New drawings — default colour & width')); add(drawingsBox());
       add(sect('Lines & space'));
       add(range('rightBars', 'Empty space on the right', 0.05, 0.6, 0.01, v => Math.round(v * 100) + '%', 'of visible bars'));
       add(range('indWidth', 'Indicator line width', 1, 3.5, 0.1, v => v.toFixed(1)));

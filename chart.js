@@ -222,12 +222,12 @@
 
       // session breaks
       if (cf.showSessionBreaks && N.isIntraday(d.tf)) {
-        const sq = N.sty('sess'); ctx.strokeStyle = sq.c || c.axis; ctx.lineWidth = sq.w || 1; ctx.setLineDash(N.dashOf(sq.d) || []); ctx.beginPath();
+        const sq = N.sty('sess'); ctx.save(); ctx.strokeStyle = sq.c || c.dim; ctx.globalAlpha = sq.c ? 1 : .5; ctx.lineWidth = sq.w || 1; ctx.setLineDash(N.dashOf(sq.d) || []); ctx.beginPath();
         for (let i = 0; i < vis.length; i++) {
           const gi = startIdx + i, prev = i === 0 ? cs[gi - 1] : vis[i - 1];
           if (prev && prev.sessionIndex !== vis[i].sessionIndex) { const x = Math.round(X(gi) - slot / 2) + .5; if (x > pad.left && x < W - pad.right) { ctx.moveTo(x, pad.top); ctx.lineTo(x, subTop + subH); } }
         }
-        ctx.stroke(); ctx.setLineDash([]);
+        ctx.stroke(); ctx.setLineDash([]); ctx.restore();
       }
       // zones
       for (const z of d.zones) { const a = Y(z.from), b = Y(z.to), zx = z.fromIdx != null ? clamp(X(z.fromIdx) - slot / 2, pad.left, W - pad.right) : pad.left; ctx.fillStyle = z.color; ctx.fillRect(zx, Math.min(a, b), W - pad.right - zx, Math.max(1, Math.abs(b - a))); }
